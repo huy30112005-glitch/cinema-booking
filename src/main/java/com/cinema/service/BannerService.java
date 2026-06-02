@@ -2,6 +2,7 @@ package com.cinema.service;
 
 import com.cinema.entity.Banner;
 import com.cinema.repository.BannerRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +25,9 @@ public class BannerService {
     );
 
     private final BannerRepository bannerRepository;
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
     public BannerService(BannerRepository bannerRepository) {
         this.bannerRepository = bannerRepository;
@@ -76,13 +80,13 @@ public class BannerService {
         String fileName = "banner-" + UUID.randomUUID().toString().replace("-", "") + extension;
 
         try {
-            Path uploadDir = Path.of("src", "main", "resources", "static", "image")
+            Path uploadPath = Path.of(uploadDir, "image")
                     .toAbsolutePath()
                     .normalize();
-            Files.createDirectories(uploadDir);
+            Files.createDirectories(uploadPath);
             Files.copy(
                     image.getInputStream(),
-                    uploadDir.resolve(fileName),
+                    uploadPath.resolve(fileName),
                     StandardCopyOption.REPLACE_EXISTING
             );
         } catch (IOException e) {

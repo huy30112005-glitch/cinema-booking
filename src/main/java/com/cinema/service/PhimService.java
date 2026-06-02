@@ -4,6 +4,7 @@ import com.cinema.entity.Phim;
 import com.cinema.entity.DinhDang;
 import com.cinema.entity.TheLoai;
 import com.cinema.repository.PhimRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,9 @@ public class PhimService {
 
     @Autowired
     private PhimRepository phimRepository;
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
     public List<Phim> getAllPhim(){
         return phimRepository.findAllWithDetails();
@@ -144,13 +148,13 @@ public class PhimService {
         String fileName = UUID.randomUUID().toString().replace("-", "") + extension;
 
         try {
-            Path uploadDir = Path.of("src", "main", "resources", "static", "image")
+            Path uploadPath = Path.of(uploadDir, "image")
                     .toAbsolutePath()
                     .normalize();
-            Files.createDirectories(uploadDir);
+            Files.createDirectories(uploadPath);
             Files.copy(
                     poster.getInputStream(),
-                    uploadDir.resolve(fileName),
+                    uploadPath.resolve(fileName),
                     StandardCopyOption.REPLACE_EXISTING
             );
         } catch (IOException e) {
