@@ -9,6 +9,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 public class SeatHoldService {
@@ -95,6 +97,36 @@ public class SeatHoldService {
     public boolean isHeldByOtherUser(Integer maSuatChieu, Integer maGhe, NguoiDung user) {
         SeatHold hold = getActiveHold(maSuatChieu, maGhe);
         return hold != null && (user == null || !hold.userId().equals(user.getMaNguoiDung()));
+    }
+
+    public Set<Integer> findHeldSeatIdsByOtherUser(Integer maSuatChieu, NguoiDung user) {
+        cleanupExpired();
+
+        if (user == null || user.getMaNguoiDung() == null) {
+            return new HashSet<>(jdbcTemplate.queryForList(
+                    """
+                            SELECT Ma_Ghe
+                            FROM GHE_DANG_GIU
+                            WHERE Ma_Suat_Chieu = ?
+                              AND Giu_Den > CURRENT_TIMESTAMP
+                            """,
+                    Integer.class,
+                    maSuatChieu
+            ));
+        }
+
+        return new HashSet<>(jdbcTemplate.queryForList(
+                """
+                        SELECT Ma_Ghe
+                        FROM GHE_DANG_GIU
+                        WHERE Ma_Suat_Chieu = ?
+                          AND Ma_Nguoi_Dung <> ?
+                          AND Giu_Den > CURRENT_TIMESTAMP
+                        """,
+                Integer.class,
+                maSuatChieu,
+                user.getMaNguoiDung()
+        ));
     }
 
     public void requireHeldByUser(Integer maSuatChieu, Integer maGhe, NguoiDung user) {

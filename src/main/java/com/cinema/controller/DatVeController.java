@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import com.cinema.entity.NguoiDung;
 
 import java.util.List;
+import java.util.Set;
 
 
 @RestController
@@ -78,22 +79,22 @@ public class DatVeController {
             }
 
             NguoiDung user = (NguoiDung) session.getAttribute("user");
+            Set<Integer> gheDangGiu = seatHoldService.findHeldSeatIdsByOtherUser(maSuatChieu, user);
 
             List<GheDTO> dsGhe = jdbcTemplate.query(
                     """
                             SELECT
                                 g.Ma_Ghe,
                                 g.So_Ghe,
-                                CASE
-                                    WHEN v.Ma_Ve IS NULL THEN 0
-                                    ELSE 1
-                                END AS Da_Dat
+                                EXISTS (
+                                    SELECT 1
+                                    FROM VE v
+                                    WHERE v.Ma_Ghe = g.Ma_Ghe
+                                      AND v.Ma_Xuat_Chieu = sc.Ma_Suat_Chieu
+                                ) AS Da_Dat
                             FROM GHE g
                             INNER JOIN SUAT_CHIEU sc
                                 ON sc.Ma_Phong = g.Ma_Phong
-                            LEFT JOIN VE v
-                                ON v.Ma_Ghe = g.Ma_Ghe
-                               AND v.Ma_Xuat_Chieu = sc.Ma_Suat_Chieu
                             WHERE sc.Ma_Suat_Chieu = ?
                             ORDER BY g.So_Ghe
                             """,
@@ -101,12 +102,8 @@ public class DatVeController {
                             rs.getInt("Ma_Ghe"),
                             rs.getString("So_Ghe"),
                             "",
-                            rs.getInt("Da_Dat") == 1,
-                            seatHoldService.isHeldByOtherUser(
-                                    maSuatChieu,
-                                    rs.getInt("Ma_Ghe"),
-                                    user
-                            ),
+                            rs.getBoolean("Da_Dat"),
+                            gheDangGiu.contains(rs.getInt("Ma_Ghe")),
                             null
                     ),
                     maSuatChieu
