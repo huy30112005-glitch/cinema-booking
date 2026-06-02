@@ -2,32 +2,30 @@ package com.cinema.service;
 
 import com.cinema.dto.payment.BankTransferInfoRequest;
 import com.cinema.dto.payment.BankTransferInfoResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 @Service
 public class BankTransferInfoService {
 
-    private final ObjectMapper objectMapper;
-    private final Path storagePath;
+    private final JdbcTemplate jdbcTemplate;
 
-    public BankTransferInfoService(
-            ObjectMapper objectMapper,
-            @Value("${payment.bank-info-file:bank-transfer-info.json}") String bankInfoFile) {
-        this.objectMapper = objectMapper;
-        this.storagePath = Path.of(bankInfoFile);
+    public BankTransferInfoService(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public BankTransferInfoResponse getInfo() {
+        ensureTable();
         BankTransferInfo data = readInfo();
         return toResponse(data);
     }
 
+    @Transactional
     public BankTransferInfoResponse updateInfo(BankTransferInfoRequest request) {
         String bankCode = normalize(request.bankCode());
         String bankName = normalize(request.bankName());
@@ -39,34 +37,58 @@ public class BankTransferInfoService {
         }
 
         BankTransferInfo data = new BankTransferInfo(bankCode, bankName, accountName, accountNumber);
+        ensureTable();
         writeInfo(data);
         return toResponse(data);
     }
 
-    private BankTransferInfo readInfo() {
-        if (!Files.exists(storagePath)) {
-            return new BankTransferInfo("", "", "", "");
-        }
+    private void ensureTable() {
+        jdbcTemplate.execute("""
+                create table if not exists bank_transfer_info (
+                    id integer primary key,
+                    bank_code varchar(32) not null,
+                    bank_name varchar(120) not null,
+                    account_name varchar(160) not null,
+                    account_number varchar(64) not null
+                )
+                """);
+    }
 
+    private BankTransferInfo readInfo() {
         try {
-            return objectMapper.readValue(storagePath.toFile(), BankTransferInfo.class);
-        } catch (IOException e) {
+            return jdbcTemplate.queryForObject("""
+                    select bank_code, bank_name, account_name, account_number
+                    from bank_transfer_info
+                    where id = 1
+                    """, (rs, rowNum) -> mapInfo(rs));
+        } catch (EmptyResultDataAccessException e) {
             return new BankTransferInfo("", "", "", "");
         }
     }
 
     private void writeInfo(BankTransferInfo data) {
-        try {
-            Path parent = storagePath.toAbsolutePath().getParent();
+        jdbcTemplate.update("""
+                insert into bank_transfer_info (id, bank_code, bank_name, account_name, account_number)
+                values (1, ?, ?, ?, ?)
+                on conflict (id) do update set
+                    bank_code = excluded.bank_code,
+                    bank_name = excluded.bank_name,
+                    account_name = excluded.account_name,
+                    account_number = excluded.account_number
+                """,
+                data.bankCode(),
+                data.bankName(),
+                data.accountName(),
+                data.accountNumber());
+    }
 
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(storagePath.toFile(), data);
-        } catch (IOException e) {
-            throw new IllegalStateException("Không lưu được thông tin chuyển khoản");
-        }
+    private BankTransferInfo mapInfo(ResultSet rs) throws SQLException {
+        return new BankTransferInfo(
+                rs.getString("bank_code"),
+                rs.getString("bank_name"),
+                rs.getString("account_name"),
+                rs.getString("account_number")
+        );
     }
 
     private BankTransferInfoResponse toResponse(BankTransferInfo data) {
