@@ -56,7 +56,7 @@ function hienThiMucAdmin(section, scrollToSection = true) {
 
 function loadBanner() {
 
-    fetch("http://localhost:8081/banner")
+    fetch("/banner")
         .then(res => res.json())
         .then(data => {
             danhSachBanner = data;
@@ -123,7 +123,7 @@ function themBanner() {
         formData.append("thuTu", thuTu);
     }
 
-    fetch("http://localhost:8081/banner", {
+    fetch("/banner", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -154,7 +154,7 @@ function xoaBanner(id) {
         return;
     }
 
-    fetch(`http://localhost:8081/banner/${id}`, {
+    fetch(`/banner/${id}`, {
         method: "DELETE",
         credentials: "include"
     })
@@ -175,7 +175,7 @@ function xoaBanner(id) {
 
 function hienThiPhim() {
 
-    fetch("http://localhost:8081/phim")
+    fetch("/phim")
         .then(res => res.json())
         .then(data => {
 
@@ -272,7 +272,7 @@ function renderPhim(data) {
 
 function loadDinhDang() {
 
-    fetch("http://localhost:8081/dinhdang")
+    fetch("/dinhdang")
         .then(res => res.json())
         .then(data => {
 
@@ -299,7 +299,7 @@ function loadDinhDang() {
 
 function loadTheLoai() {
 
-    fetch("http://localhost:8081/theloai")
+    fetch("/theloai")
         .then(res => res.json())
         .then(data => {
 
@@ -326,7 +326,7 @@ function loadTheLoai() {
 
 function loadPhong() {
 
-    fetch("http://localhost:8081/phong")
+    fetch("/phong")
         .then(res => res.json())
         .then(data => {
 
@@ -355,7 +355,7 @@ function loadPhong() {
 
 function loadSuatChieu() {
 
-    fetch("http://localhost:8081/admin/suatchieu")
+    fetch("/admin/suatchieu")
         .then(res => res.json())
         .then(data => {
 
@@ -368,7 +368,7 @@ function loadSuatChieu() {
 
 function loadThongTinChuyenKhoan() {
 
-    fetch("http://localhost:8081/payment/bank-info", {
+    fetch("/payment/bank-info", {
         credentials: "include"
     })
         .then(res => res.json())
@@ -399,7 +399,7 @@ function luuThongTinChuyenKhoan() {
         accountNumber: document.getElementById("soTaiKhoan").value
     };
 
-    fetch("http://localhost:8081/payment/bank-info", {
+    fetch("/payment/bank-info", {
 
         method: "PUT",
         credentials: "include",
@@ -450,7 +450,7 @@ function traCuuVe(maQr = null) {
 
     input.value = value;
     guiYeuCauKiemVe(
-            "http://localhost:8081/admin/ve/kiem-tra",
+            "/admin/ve/kiem-tra",
             value,
             "Đang tra cứu vé...",
             false
@@ -475,7 +475,7 @@ function xacNhanSuDungVe() {
     }
 
     guiYeuCauKiemVe(
-            "http://localhost:8081/admin/ve/xac-nhan",
+            "/admin/ve/xac-nhan",
             value,
             "Đang xác nhận sử dụng vé...",
             true
@@ -730,7 +730,7 @@ function themSuatChieu() {
         return;
     }
 
-    fetch("http://localhost:8081/admin/suatchieu", {
+    fetch("/admin/suatchieu", {
 
         method: "POST",
 
@@ -805,7 +805,7 @@ function xoaSuatChieu(id) {
         return;
     }
 
-    fetch(`http://localhost:8081/admin/suatchieu/${id}`, {
+    fetch(`/admin/suatchieu/${id}`, {
         method: "DELETE"
     })
         .then(() => {
@@ -821,7 +821,7 @@ function themPhim() {
 
     let formData = layDuLieuFormData();
 
-    fetch("http://localhost:8081/phim", {
+    fetch("/phim", {
 
         method: "POST",
 
@@ -896,7 +896,7 @@ function capNhatPhim() {
 
     let formData = layDuLieuFormData();
 
-    fetch(`http://localhost:8081/phim/${id}`, {
+    fetch(`/phim/${id}`, {
 
         method: "PUT",
 
@@ -932,7 +932,7 @@ function xoaPhim(id) {
 
     if (confirm("Bạn có chắc muốn xóa phim này không?")) {
 
-        fetch(`http://localhost:8081/phim/${id}`, {
+        fetch(`/phim/${id}`, {
 
             method: "DELETE"
 

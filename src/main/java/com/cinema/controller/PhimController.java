@@ -18,8 +18,11 @@ public class PhimController {
     private PhimService phimService;
 
     @GetMapping
-    public List<Phim> getAllPhim() {
-        return phimService.getAllPhim();
+    public List<PhimResponse> getAllPhim() {
+        return phimService.getAllPhim()
+                .stream()
+                .map(PhimResponse::from)
+                .toList();
     }
 
     @GetMapping("/hot")
@@ -95,6 +98,50 @@ public class PhimController {
                 doTuoi,
                 poster
         );
+    }
+
+    public record PhimResponse(
+            Integer maPhim,
+            String tenPhim,
+            String thoiLuong,
+            String moTa,
+            String trailer,
+            String doTuoi,
+            String anhPoster,
+            DinhDangResponse maDinhDang,
+            TheLoaiResponse maTheLoai) {
+
+        private static PhimResponse from(Phim phim) {
+            return new PhimResponse(
+                    phim.getMaPhim(),
+                    phim.getTenPhim(),
+                    phim.getThoiLuong(),
+                    phim.getMoTa(),
+                    phim.getTrailer(),
+                    phim.getDoTuoi(),
+                    phim.getAnhPoster(),
+                    phim.getMaDinhDang() != null
+                            ? new DinhDangResponse(
+                                    phim.getMaDinhDang().getMaDinhDang(),
+                                    phim.getMaDinhDang().getTenDinhDang())
+                            : null,
+                    phim.getMaTheLoai() != null
+                            ? new TheLoaiResponse(
+                                    phim.getMaTheLoai().getMaTheLoai(),
+                                    phim.getMaTheLoai().getTenTheLoai())
+                            : null
+            );
+        }
+    }
+
+    public record DinhDangResponse(
+            Integer maDinhDang,
+            String tenDinhDang) {
+    }
+
+    public record TheLoaiResponse(
+            Integer maTheLoai,
+            String tenTheLoai) {
     }
 
     public record PhimHomeResponse(

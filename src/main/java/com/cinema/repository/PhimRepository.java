@@ -2,12 +2,17 @@ package com.cinema.repository;
 
 import com.cinema.entity.Phim;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
 public interface PhimRepository extends JpaRepository<Phim, Integer> {
+
+    @EntityGraph(attributePaths = {"maDinhDang", "maTheLoai"})
+    @Query("SELECT p FROM Phim p ORDER BY p.maPhim ASC")
+    List<Phim> findAllWithDetails();
 
     @Query("""
             SELECT p

@@ -31,7 +31,7 @@ public class PhimService {
     private PhimRepository phimRepository;
 
     public List<Phim> getAllPhim(){
-        return phimRepository.findAll();
+        return phimRepository.findAllWithDetails();
     }
 
     public List<Phim> getHotPhim(int limit) {

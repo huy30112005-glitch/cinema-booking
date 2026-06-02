@@ -87,7 +87,7 @@ function xoaTrangThaiVuaDangNhap() {
 
 function hienThiPhim() {
 
-    fetch("http://localhost:8081/phim")
+    fetch("/phim")
         .then(res => res.json())
         .then(data => {
 
@@ -101,7 +101,7 @@ function hienThiPhim() {
 
 function hienThiBanner() {
 
-    fetch("http://localhost:8081/banner")
+    fetch("/banner")
         .then(res => res.json())
         .then(data => {
             renderBanner(data);
@@ -483,7 +483,7 @@ function chonPhim(maPhim) {
 
 function loadSuatChieu(maPhim) {
 
-    fetch(`http://localhost:8081/datve/suatchieu/${maPhim}`)
+    fetch(`/datve/suatchieu/${maPhim}`)
         .then(res => res.json())
         .then(data => {
 
@@ -681,7 +681,7 @@ function loadGheTheoSuatChieu(silent = false) {
         return;
     }
 
-    fetch(`http://localhost:8081/datve/ghe/${maSuatChieu}`)
+    fetch(`/datve/ghe/${maSuatChieu}`)
         .then(async res => {
 
             if (!res.ok) {
