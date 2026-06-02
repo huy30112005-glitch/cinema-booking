@@ -1,4 +1,5 @@
 let danhSachPhim = [];
+let danhSachPhimHot = [];
 let user = layUserDaLuu();
 let phimDangChon = null;
 let gheDangChon = [];
@@ -6,6 +7,7 @@ let gheRefreshTimer = null;
 let bannerIndex = 0;
 let bannerTimer = null;
 let dangKiemTraDangNhap = true;
+let dangHienTatCaPhim = false;
 let maPhimDangChoDat = layMaPhimCanDatTuUrl()
     || Number(sessionStorage.getItem("pendingBookingMovieId"));
 
@@ -92,10 +94,23 @@ function hienThiPhim() {
         .then(data => {
 
             danhSachPhim = data;
-            renderPhim(danhSachPhim);
+            return fetch("/phim/hot?limit=4");
+
+        })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+
+            danhSachPhimHot = data;
+            renderPhimTrangChu();
             thuMoDatVeDangCho();
 
+        })
+        .catch(() => {
+            danhSachPhimHot = danhSachPhim.slice(0, 4);
+            renderPhimTrangChu();
+            thuMoDatVeDangCho();
         });
+
 
 }
 
@@ -118,6 +133,11 @@ function renderBanner(data) {
     const banner = document.getElementById("bannerPhim");
 
     if (!banner) {
+        return;
+    }
+
+    if (dangHienTatCaPhim) {
+        anBannerTrangChu();
         return;
     }
 
@@ -162,6 +182,21 @@ function renderBanner(data) {
 
     banner.classList.remove("hidden");
     batDauTuDongDoiBanner(danhSachBanner.length);
+
+}
+
+function anBannerTrangChu() {
+
+    if (bannerTimer) {
+        clearInterval(bannerTimer);
+        bannerTimer = null;
+    }
+
+    const banner = document.getElementById("bannerPhim");
+
+    if (banner) {
+        banner.classList.add("hidden");
+    }
 
 }
 
@@ -215,30 +250,7 @@ function renderPhim(data) {
 
                 <h3>${p.tenPhim}</h3>
 
-                <p>
-                    <b>Thời lượng:</b>
-                    ${p.thoiLuong} phút
-                </p>
-
-                <p>
-                    <b>Mô tả:</b>
-                    ${p.moTa}
-                </p>
-
-                <p>
-                    <b>Định dạng:</b>
-                    ${p.maDinhDang?.tenDinhDang || ""}
-                </p>
-
-                <p>
-                    <b>Thể loại:</b>
-                    ${p.maTheLoai?.tenTheLoai || ""}
-                </p>
-
-                <p>
-                    <b>Độ tuổi:</b>
-                    ${p.doTuoi || "Chưa cập nhật"}
-                </p>
+                <p class="movie-duration">${hienThiThoiLuong(p.thoiLuong)}</p>
 
                 <button
                     class="btn-them"
@@ -252,6 +264,74 @@ function renderPhim(data) {
     });
 
     document.getElementById("dsPhim").innerHTML = html;
+
+}
+
+function renderPhimTrangChu() {
+
+    const danhSach = dangHienTatCaPhim
+        ? danhSachPhim
+        : layDanhSachPhimHot();
+
+    if (dangHienTatCaPhim) {
+        anBannerTrangChu();
+    }
+
+    capNhatTieuDePhim(dangHienTatCaPhim ? "Tất cả phim" : "Phim đang chiếu");
+    renderPhim(danhSach);
+
+}
+
+function layDanhSachPhimHot() {
+
+    if (danhSachPhimHot.length > 0) {
+        return danhSachPhimHot.slice(0, 4);
+    }
+
+    return danhSachPhim.slice(0, 4);
+
+}
+
+function hienThiTatCaPhim() {
+
+    dangHienTatCaPhim = true;
+    anBannerTrangChu();
+
+    const input = document.getElementById("tuKhoaPhim");
+
+    if (input) {
+        input.value = "";
+    }
+
+    capNhatTieuDePhim("Tất cả phim");
+    renderPhim(danhSachPhim);
+
+}
+
+function capNhatTieuDePhim(title) {
+
+    const titleElement = document.getElementById("tieuDeDanhSachPhim");
+    const button = document.getElementById("btnXemTatCaPhim");
+
+    if (titleElement) {
+        titleElement.innerText = title;
+    }
+
+    if (button) {
+        button.classList.toggle("hidden", dangHienTatCaPhim);
+    }
+
+}
+
+function hienThiThoiLuong(value) {
+
+    const text = String(value || "").trim();
+
+    if (!text) {
+        return "Chưa cập nhật";
+    }
+
+    return text.toLowerCase().includes("phút") ? text : `${text} phút`;
 
 }
 
@@ -431,7 +511,15 @@ function layYoutubeId(value) {
 
 function locPhim() {
 
-    let tuKhoa = document.getElementById("tuKhoaPhim").value.toLowerCase();
+    let tuKhoa = document.getElementById("tuKhoaPhim").value.trim().toLowerCase();
+
+    if (!tuKhoa) {
+        dangHienTatCaPhim = false;
+        capNhatTieuDePhim("Phim đang chiếu");
+        renderPhimTrangChu();
+        hienThiBanner();
+        return;
+    }
 
     let ketQua = danhSachPhim.filter(p => {
 
@@ -446,6 +534,9 @@ function locPhim() {
 
     });
 
+    dangHienTatCaPhim = true;
+    anBannerTrangChu();
+    capNhatTieuDePhim("Kết quả tìm kiếm");
     renderPhim(ketQua);
 
 }
