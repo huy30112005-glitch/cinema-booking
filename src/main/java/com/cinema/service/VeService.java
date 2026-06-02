@@ -57,7 +57,7 @@ public class VeService {
         return toDTO(saved);
     }
 
-    private VeDTO toDTO(Ve saved) {
+    public VeDTO toDTO(Ve saved) {
         return new VeDTO(
                 saved.getMaVe(),
                 saved.getGia(),

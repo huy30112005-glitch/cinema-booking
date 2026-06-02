@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thông tin cá nhân</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=profile-db-tickets-1">
 </head>
 
 <body>
@@ -64,7 +64,7 @@
     <div class="booking-header">
         <div>
             <h2>Vé của tôi</h2>
-            <p class="muted">Danh sách vé đã thanh toán trên trình duyệt này</p>
+            <p class="muted">Danh sách vé đã được hệ thống phát hành</p>
         </div>
     </div>
 
@@ -90,7 +90,7 @@
                 user = await res.json();
                 localStorage.setItem("user", JSON.stringify(user));
                 hienThiHoSo();
-                hienThiVe();
+                taiVeCuaToi();
             })
             .catch(() => {
                 alert("Không kết nối được server");
@@ -162,12 +162,30 @@
             });
     }
 
-    function hienThiVe() {
-        const tickets = layVeCuaToi();
+    function taiVeCuaToi() {
+        fetch("/payment/my-tickets", {
+            credentials: "include"
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    throw new Error(await res.text() || "Không tải được vé");
+                }
+
+                return res.json();
+            })
+            .then(tickets => {
+                hienThiVe(tickets);
+            })
+            .catch(() => {
+                hienThiVe(layVeCuaToi());
+            });
+    }
+
+    function hienThiVe(tickets) {
         const dsVe = document.getElementById("dsVe");
 
         if (tickets.length === 0) {
-            dsVe.innerHTML = `<p class="muted">Bạn chưa có vé nào được lưu trên trình duyệt này.</p>`;
+            dsVe.innerHTML = `<p class="muted">Bạn chưa có vé nào được phát hành.</p>`;
             return;
         }
 

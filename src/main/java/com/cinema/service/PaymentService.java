@@ -108,6 +108,14 @@ public class PaymentService {
                     PRIMARY KEY (ma_thanh_toan, ma_ghe)
                 )
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS thanh_toan_ve (
+                    ma_thanh_toan INTEGER NOT NULL,
+                    ma_ve INTEGER NOT NULL,
+                    PRIMARY KEY (ma_thanh_toan, ma_ve)
+                )
+                """);
     }
 
     @Transactional
@@ -388,6 +396,7 @@ public class PaymentService {
         for (Ghe ghe : gheList) {
             veList.add(veService.emitTicket(suatChieu, ghe));
         }
+        savePaymentTickets(maThanhToan, veList);
 
         DonHang donHang = thanhToan.getDonHang();
         donHang.setTrangThai(true);
@@ -417,6 +426,35 @@ public class PaymentService {
                 seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
 
         return ResponseEntity.ok(new ApiResponse(true, "Đã từ chối thanh toán và nhả ghế"));
+    }
+
+    public ResponseEntity<?> getMyTickets(HttpSession session) {
+        NguoiDung user = (NguoiDung) session.getAttribute("user");
+
+        if (user == null || user.getMaNguoiDung() == null) {
+            return ResponseEntity.status(401).body(new ApiResponse(false, "Vui lòng đăng nhập để xem vé"));
+        }
+
+        List<Integer> ticketIds = jdbcTemplate.queryForList(
+                """
+                        SELECT DISTINCT tv.ma_ve
+                        FROM thanh_toan_ve tv
+                        JOIN THANH_TOAN tt ON tt.Ma_Thanh_Toan = tv.ma_thanh_toan
+                        JOIN DON_HANG dh ON dh.Ma_Don_Hang = tt.Ma_Don_Hang
+                        WHERE dh.Ma_Nguoi_Dung = ?
+                          AND tt.Trang_Thai = TRUE
+                        ORDER BY tv.ma_ve DESC
+                        """,
+                Integer.class,
+                user.getMaNguoiDung()
+        );
+
+        List<VeDTO> tickets = veRepository.findAllById(ticketIds)
+                .stream()
+                .map(veService::toDTO)
+                .toList();
+
+        return ResponseEntity.ok(tickets);
     }
 
     @Transactional
@@ -536,6 +574,7 @@ public class PaymentService {
             for (Ghe ghe : gheList) {
                 veList.add(veService.emitTicket(suatChieu, ghe));
             }
+            savePaymentTickets(maThanhToan, veList);
 
             DonHang donHang = thanhToan.getDonHang();
             donHang.setTrangThai(true);
@@ -951,6 +990,20 @@ public class PaymentService {
         );
 
         return values.isEmpty() ? null : values.get(0);
+    }
+
+    private void savePaymentTickets(Integer maThanhToan, List<VeDTO> veList) {
+        for (VeDTO ve : veList) {
+            if (ve == null || ve.getMaVe() == null) {
+                continue;
+            }
+
+            jdbcTemplate.update("""
+                    INSERT INTO thanh_toan_ve (ma_thanh_toan, ma_ve)
+                    VALUES (?, ?)
+                    ON CONFLICT (ma_thanh_toan, ma_ve) DO NOTHING
+                    """, maThanhToan, ve.getMaVe());
+        }
     }
 
     private Double tinhGiaVe(Ghe ghe) {

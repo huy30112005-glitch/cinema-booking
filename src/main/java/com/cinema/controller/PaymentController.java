@@ -50,6 +50,11 @@ public class PaymentController {
         return ResponseEntity.ok(bankTransferInfoService.getInfo());
     }
 
+    @GetMapping("/my-tickets")
+    public ResponseEntity<?> myTickets(HttpSession session) {
+        return paymentService.getMyTickets(session);
+    }
+
     @PutMapping("/bank-info")
     public ResponseEntity<?> updateBankInfo(
             @RequestBody BankTransferInfoRequest request,
