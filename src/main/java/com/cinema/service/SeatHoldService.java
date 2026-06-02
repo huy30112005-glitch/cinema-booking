@@ -167,6 +167,31 @@ public class SeatHoldService {
         );
     }
 
+    public void extendHold(Integer maSuatChieu, Integer maGhe, NguoiDung user, Duration duration) {
+        if (user == null || user.getMaNguoiDung() == null) {
+            throw new IllegalArgumentException("Vui lòng đăng nhập để thanh toán");
+        }
+
+        Instant expiresAt = Instant.now().plus(duration);
+        int updated = jdbcTemplate.update(
+                """
+                        UPDATE GHE_DANG_GIU
+                        SET Giu_Den = ?
+                        WHERE Ma_Suat_Chieu = ?
+                          AND Ma_Ghe = ?
+                          AND Ma_Nguoi_Dung = ?
+                        """,
+                toOffsetDateTime(expiresAt),
+                maSuatChieu,
+                maGhe,
+                user.getMaNguoiDung()
+        );
+
+        if (updated == 0) {
+            throw new IllegalArgumentException("Thời gian giữ ghế đã hết. Vui lòng chọn lại ghế");
+        }
+    }
+
     private void cleanupExpired() {
         jdbcTemplate.update("DELETE FROM GHE_DANG_GIU WHERE Giu_Den <= CURRENT_TIMESTAMP");
     }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản trị rạp phim</title>
-    <link rel="stylesheet" href="css/style.css?v=admin-ticket-check-3">
+    <link rel="stylesheet" href="css/style.css?v=admin-payment-review-1">
 </head>
 <body class="app-shell admin-page">
 
@@ -21,6 +21,7 @@
 
     <nav class="nav-links" aria-label="Điều hướng quản trị">
         <a href="#formKiemVe" class="admin-nav-link active" onclick="hienThiMucAdmin('ticket')">Kiểm vé</a>
+        <a href="#formDuyetThanhToan" class="admin-nav-link" onclick="hienThiMucAdmin('payment-review')">Duyệt thanh toán</a>
         <a href="#formChuyenKhoan" class="admin-nav-link" onclick="hienThiMucAdmin('payment')">Chuyển khoản</a>
         <a href="#formBanner" class="admin-nav-link" onclick="hienThiMucAdmin('banner')">Banner</a>
         <a href="#formPhim" class="admin-nav-link" onclick="hienThiMucAdmin('movie')">Phim</a>
@@ -118,6 +119,21 @@
             <button class="btn-them" onclick="luuThongTinChuyenKhoan()">
                 Lưu thông tin
             </button>
+        </section>
+
+        <section class="form admin-panel admin-panel-wide admin-section hidden" id="formDuyetThanhToan" data-admin-section="payment-review">
+            <div class="booking-header">
+                <div>
+                    <h2>Duyệt thanh toán</h2>
+                    <p class="muted">Xác nhận các đơn khách đã chuyển khoản để phát hành vé.</p>
+                </div>
+
+                <button class="btn-sua" onclick="loadThanhToanChoDuyet()">
+                    Tải lại
+                </button>
+            </div>
+
+            <div id="dsThanhToanChoDuyet" class="movie-grid"></div>
         </section>
 
         <section class="form admin-panel admin-section hidden" id="formBanner" data-admin-section="banner">
@@ -244,7 +260,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<script src="js/admin.js?v=admin-ticket-check-3"></script>
+<script src="js/admin.js?v=admin-payment-review-1"></script>
 
 </body>
 </html>

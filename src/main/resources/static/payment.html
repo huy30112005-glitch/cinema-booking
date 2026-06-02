@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thanh toán</title>
-    <link rel="stylesheet" href="css/style.css?v=payment-center-1">
+    <link rel="stylesheet" href="css/style.css?v=payment-review-1">
 </head>
 
 <body class="payment-page">
@@ -13,7 +13,7 @@
 <div class="topbar">
     <div>
         <h1>Thanh toán giả lập</h1>
-        <p class="muted">Xác nhận thanh toán để hệ thống phát hành vé</p>
+        <p class="muted">Chuyển khoản xong, gửi yêu cầu để admin xác nhận và phát hành vé</p>
     </div>
 
     <button class="btn-xoa" onclick="window.location.href='/index.html'">
@@ -81,7 +81,7 @@
 
     <div class="payment-actions">
         <button id="btnXacNhanThanhToan" class="btn-them" onclick="xacNhanThanhToan()">
-            Thanh toán thành công
+            Tôi đã thanh toán
         </button>
 
         <button class="btn-xoa" onclick="window.location.href='/index.html'">
@@ -213,11 +213,11 @@
 
                 return res.json();
             })
-            .then(ve => {
-                luuVeCuaToi(ve);
-                const dsVe = Array.isArray(ve) ? ve : [ve];
-                const maVe = dsVe.map(item => item.maVe).filter(Boolean).join(", ");
-                alert(`Thanh toán thành công. Mã vé: ${maVe}`);
+            .then(data => {
+                document.getElementById("trangThai").innerText = "Chờ admin xác nhận";
+                document.getElementById("btnXacNhanThanhToan").disabled = true;
+                document.getElementById("btnXacNhanThanhToan").innerText = "Đang chờ duyệt";
+                alert(data.message || "Đã gửi yêu cầu xác nhận thanh toán. Vui lòng chờ admin duyệt vé.");
                 window.location.href = "/index.html";
             })
             .catch(err => {

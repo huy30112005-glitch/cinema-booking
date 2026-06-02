@@ -11,8 +11,10 @@ import com.cinema.entity.*;
 import com.cinema.repository.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -39,6 +42,11 @@ public class PaymentService {
     private static final String PAYMENT_SESSION_PREFIX = "payment:";
     private static final String PHUONG_THUC_GIA_LAP = "Thanh toán giả lập";
     private static final String PHUONG_THUC_MOMO = "MoMo";
+    private static final String TRANG_THAI_CHO_KHACH = "CREATED";
+    private static final String TRANG_THAI_CHO_ADMIN = "WAITING_ADMIN";
+    private static final String TRANG_THAI_DA_DUYET = "CONFIRMED";
+    private static final String TRANG_THAI_TU_CHOI = "REJECTED";
+    private static final Duration ADMIN_REVIEW_HOLD_DURATION = Duration.ofHours(24);
 
     private final SuatChieuRepository suatChieuRepository;
     private final GheRepository gheRepository;
@@ -50,6 +58,7 @@ public class PaymentService {
     private final SeatHoldService seatHoldService;
     private final MomoProperties momoProperties;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
     private final RestTemplate restTemplate;
 
     public PaymentService(
@@ -62,7 +71,8 @@ public class PaymentService {
             VeService veService,
             SeatHoldService seatHoldService,
             MomoProperties momoProperties,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            JdbcTemplate jdbcTemplate) {
         this.suatChieuRepository = suatChieuRepository;
         this.gheRepository = gheRepository;
         this.veRepository = veRepository;
@@ -73,7 +83,31 @@ public class PaymentService {
         this.seatHoldService = seatHoldService;
         this.momoProperties = momoProperties;
         this.objectMapper = objectMapper;
+        this.jdbcTemplate = jdbcTemplate;
         this.restTemplate = new RestTemplate();
+    }
+
+    @PostConstruct
+    public void initPendingPaymentSchema() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS thanh_toan_cho_duyet (
+                    ma_thanh_toan INTEGER PRIMARY KEY,
+                    ma_suat_chieu INTEGER NOT NULL,
+                    ma_nguoi_dung INTEGER NOT NULL,
+                    trang_thai VARCHAR(32) NOT NULL,
+                    thoi_gian_tao TIMESTAMP NOT NULL,
+                    thoi_gian_yeu_cau TIMESTAMP NULL,
+                    thoi_gian_xu_ly TIMESTAMP NULL
+                )
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS thanh_toan_cho_duyet_ghe (
+                    ma_thanh_toan INTEGER NOT NULL,
+                    ma_ghe INTEGER NOT NULL,
+                    PRIMARY KEY (ma_thanh_toan, ma_ghe)
+                )
+                """);
     }
 
     @Transactional
@@ -155,6 +189,7 @@ public class PaymentService {
                 PAYMENT_SESSION_PREFIX + thanhToan.getMaThanhToan(),
                 new PendingPayment(request.getMaSuatChieu(), maGheList)
         );
+        savePendingPayment(thanhToan.getMaThanhToan(), request.getMaSuatChieu(), user.getMaNguoiDung(), maGheList);
 
         String paymentUrl;
 
@@ -213,13 +248,114 @@ public class PaymentService {
     @Transactional
     public ResponseEntity<?> confirmSuccess(ConfirmPaymentRequest request, HttpSession session) {
 
+        NguoiDung user = (NguoiDung) session.getAttribute("user");
+
+        if (user == null) {
+            return ResponseEntity.status(401).body(new ApiResponse(false, "Vui lòng đăng nhập để thanh toán"));
+        }
+
         PendingPayment pendingPayment = getPendingPayment(session, request.getMaThanhToan());
 
         if (pendingPayment == null) {
+            pendingPayment = getPersistedPendingPayment(request.getMaThanhToan());
+        }
+
+        if (pendingPayment == null || !isPendingPaymentOwner(request.getMaThanhToan(), user)) {
             return ResponseEntity.status(404).body(new ApiResponse(false, "Không tìm thấy phiên thanh toán"));
         }
 
         ThanhToan thanhToan = thanhToanRepository.findById(request.getMaThanhToan()).orElse(null);
+
+        if (thanhToan == null || thanhToan.getDonHang() == null) {
+            return ResponseEntity.status(404).body(new ApiResponse(false, "Không tìm thấy thanh toán"));
+        }
+
+        if (Boolean.TRUE.equals(thanhToan.getTrangThai())) {
+            return ResponseEntity.badRequest().body(new ApiResponse(false, "Thanh toán này đã hoàn tất"));
+        }
+
+        try {
+            for (Integer maGhe : pendingPayment.maGheList()) {
+                seatHoldService.requireHeldByUser(
+                        pendingPayment.maSuatChieu(),
+                        maGhe,
+                        user
+                );
+
+                seatHoldService.extendHold(
+                        pendingPayment.maSuatChieu(),
+                        maGhe,
+                        user,
+                        ADMIN_REVIEW_HOLD_DURATION
+                );
+            }
+
+            thanhToan.setThoiGianThanhToan(LocalDateTime.now());
+            thanhToanRepository.save(thanhToan);
+
+            markPendingPaymentWaitingAdmin(request.getMaThanhToan());
+
+            return ResponseEntity.ok(new ApiResponse(true, "Đã gửi yêu cầu xác nhận thanh toán. Vui lòng chờ admin duyệt vé."));
+        } catch (IllegalArgumentException e) {
+            thanhToan.setTrangThai(false);
+            thanhToan.setThoiGianThanhToan(LocalDateTime.now());
+            thanhToanRepository.save(thanhToan);
+            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
+        }
+    }
+
+    public ResponseEntity<?> getPendingBankPayments() {
+        List<Integer> paymentIds = jdbcTemplate.queryForList(
+                """
+                        SELECT ma_thanh_toan
+                        FROM thanh_toan_cho_duyet
+                        WHERE trang_thai = ?
+                        ORDER BY thoi_gian_yeu_cau ASC
+                        """,
+                Integer.class,
+                TRANG_THAI_CHO_ADMIN
+        );
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Integer paymentId : paymentIds) {
+            ThanhToan thanhToan = thanhToanRepository.findById(paymentId).orElse(null);
+            PendingPayment pendingPayment = getPersistedPendingPayment(paymentId);
+
+            if (thanhToan == null || thanhToan.getDonHang() == null || pendingPayment == null) {
+                continue;
+            }
+
+            DonHang donHang = thanhToan.getDonHang();
+            NguoiDung nguoiDung = donHang.getNguoiDung();
+            SuatChieu suatChieu = suatChieuRepository.findById(pendingPayment.maSuatChieu()).orElse(null);
+            List<Ghe> gheList = gheRepository.findAllById(pendingPayment.maGheList());
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("maThanhToan", thanhToan.getMaThanhToan());
+            item.put("maDonHang", donHang.getMaDonHang());
+            item.put("tongTien", donHang.getTongTien());
+            item.put("thoiGianYeuCau", getPendingRequestedAt(paymentId));
+            item.put("khachHang", nguoiDung != null ? nguoiDung.getTenNguoiDung() : "Khách hàng");
+            item.put("email", nguoiDung != null ? nguoiDung.getEmail() : "");
+            item.put("phim", suatChieu != null && suatChieu.getPhim() != null ? suatChieu.getPhim().getTenPhim() : "");
+            item.put("suatChieu", suatChieu != null ? suatChieu.getThoiGianBatDau() : null);
+            item.put("ghe", gheList.stream().map(Ghe::getSoGhe).sorted().toList());
+            result.add(item);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @Transactional
+    public ResponseEntity<?> approveBankPayment(Integer maThanhToan) {
+        PendingPayment pendingPayment = getPersistedPendingPayment(maThanhToan);
+
+        if (pendingPayment == null || !TRANG_THAI_CHO_ADMIN.equals(getPendingStatus(maThanhToan))) {
+            return ResponseEntity.status(404).body(new ApiResponse(false, "Không tìm thấy thanh toán chờ duyệt"));
+        }
+
+        ThanhToan thanhToan = thanhToanRepository.findById(maThanhToan).orElse(null);
 
         if (thanhToan == null || thanhToan.getDonHang() == null) {
             return ResponseEntity.status(404).body(new ApiResponse(false, "Không tìm thấy thanh toán"));
@@ -236,51 +372,51 @@ public class PaymentService {
             return ResponseEntity.badRequest().body(new ApiResponse(false, "Suất chiếu hoặc ghế không tồn tại"));
         }
 
-        try {
-            for (Integer maGhe : pendingPayment.maGheList()) {
-                seatHoldService.requireHeldByUser(
-                        pendingPayment.maSuatChieu(),
-                        maGhe,
-                        (NguoiDung) session.getAttribute("user")
-                );
+        for (Ghe ghe : gheList) {
+            boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
+                    suatChieu.getMaSuatChieu(),
+                    ghe.getMaGhe()
+            );
+
+            if (daDat) {
+                return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
             }
-
-            for (Ghe ghe : gheList) {
-                boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
-                        suatChieu.getMaSuatChieu(),
-                        ghe.getMaGhe()
-                );
-
-                if (daDat) {
-                    return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
-                }
-            }
-
-            List<VeDTO> veList = new ArrayList<>();
-
-            for (Ghe ghe : gheList) {
-                veList.add(veService.emitTicket(suatChieu, ghe));
-            }
-
-            DonHang donHang = thanhToan.getDonHang();
-            donHang.setTrangThai(true);
-            donHangRepository.save(donHang);
-
-            thanhToan.setTrangThai(true);
-            thanhToan.setThoiGianThanhToan(LocalDateTime.now());
-            thanhToanRepository.save(thanhToan);
-
-            session.removeAttribute(PAYMENT_SESSION_PREFIX + request.getMaThanhToan());
-            pendingPayment.maGheList().forEach(maGhe ->
-                    seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
-
-            return ResponseEntity.ok(veList);
-        } catch (IllegalArgumentException e) {
-            thanhToan.setTrangThai(false);
-            thanhToan.setThoiGianThanhToan(LocalDateTime.now());
-            thanhToanRepository.save(thanhToan);
-            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
         }
+
+        List<VeDTO> veList = new ArrayList<>();
+
+        for (Ghe ghe : gheList) {
+            veList.add(veService.emitTicket(suatChieu, ghe));
+        }
+
+        DonHang donHang = thanhToan.getDonHang();
+        donHang.setTrangThai(true);
+        donHangRepository.save(donHang);
+
+        thanhToan.setTrangThai(true);
+        thanhToan.setThoiGianThanhToan(LocalDateTime.now());
+        thanhToanRepository.save(thanhToan);
+
+        markPendingPaymentProcessed(maThanhToan, TRANG_THAI_DA_DUYET);
+        pendingPayment.maGheList().forEach(maGhe ->
+                seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
+
+        return ResponseEntity.ok(veList);
+    }
+
+    @Transactional
+    public ResponseEntity<?> rejectBankPayment(Integer maThanhToan) {
+        PendingPayment pendingPayment = getPersistedPendingPayment(maThanhToan);
+
+        if (pendingPayment == null || !TRANG_THAI_CHO_ADMIN.equals(getPendingStatus(maThanhToan))) {
+            return ResponseEntity.status(404).body(new ApiResponse(false, "Không tìm thấy thanh toán chờ duyệt"));
+        }
+
+        markPendingPaymentProcessed(maThanhToan, TRANG_THAI_TU_CHOI);
+        pendingPayment.maGheList().forEach(maGhe ->
+                seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
+
+        return ResponseEntity.ok(new ApiResponse(true, "Đã từ chối thanh toán và nhả ghế"));
     }
 
     @Transactional
@@ -700,6 +836,121 @@ public class PaymentService {
 
         Object value = session.getAttribute(PAYMENT_SESSION_PREFIX + maThanhToan);
         return value instanceof PendingPayment pendingPayment ? pendingPayment : null;
+    }
+
+    private void savePendingPayment(Integer maThanhToan, Integer maSuatChieu, Integer maNguoiDung, List<Integer> maGheList) {
+        jdbcTemplate.update("""
+                INSERT INTO thanh_toan_cho_duyet
+                    (ma_thanh_toan, ma_suat_chieu, ma_nguoi_dung, trang_thai, thoi_gian_tao)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (ma_thanh_toan) DO UPDATE SET
+                    ma_suat_chieu = EXCLUDED.ma_suat_chieu,
+                    ma_nguoi_dung = EXCLUDED.ma_nguoi_dung,
+                    trang_thai = EXCLUDED.trang_thai,
+                    thoi_gian_tao = EXCLUDED.thoi_gian_tao,
+                    thoi_gian_yeu_cau = NULL,
+                    thoi_gian_xu_ly = NULL
+                """, maThanhToan, maSuatChieu, maNguoiDung, TRANG_THAI_CHO_KHACH);
+
+        jdbcTemplate.update(
+                "DELETE FROM thanh_toan_cho_duyet_ghe WHERE ma_thanh_toan = ?",
+                maThanhToan
+        );
+
+        for (Integer maGhe : maGheList) {
+            jdbcTemplate.update("""
+                    INSERT INTO thanh_toan_cho_duyet_ghe (ma_thanh_toan, ma_ghe)
+                    VALUES (?, ?)
+                    ON CONFLICT (ma_thanh_toan, ma_ghe) DO NOTHING
+                    """, maThanhToan, maGhe);
+        }
+    }
+
+    private PendingPayment getPersistedPendingPayment(Integer maThanhToan) {
+        if (maThanhToan == null) {
+            return null;
+        }
+
+        List<Integer> maSuatChieuList = jdbcTemplate.queryForList(
+                "SELECT ma_suat_chieu FROM thanh_toan_cho_duyet WHERE ma_thanh_toan = ?",
+                Integer.class,
+                maThanhToan
+        );
+
+        if (maSuatChieuList.isEmpty()) {
+            return null;
+        }
+
+        List<Integer> maGheList = jdbcTemplate.queryForList(
+                """
+                        SELECT ma_ghe
+                        FROM thanh_toan_cho_duyet_ghe
+                        WHERE ma_thanh_toan = ?
+                        ORDER BY ma_ghe
+                        """,
+                Integer.class,
+                maThanhToan
+        );
+
+        return maGheList.isEmpty() ? null : new PendingPayment(maSuatChieuList.get(0), maGheList);
+    }
+
+    private boolean isPendingPaymentOwner(Integer maThanhToan, NguoiDung user) {
+        if (maThanhToan == null || user == null || user.getMaNguoiDung() == null) {
+            return false;
+        }
+
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM thanh_toan_cho_duyet
+                        WHERE ma_thanh_toan = ?
+                          AND ma_nguoi_dung = ?
+                        """,
+                Integer.class,
+                maThanhToan,
+                user.getMaNguoiDung()
+        );
+
+        return count != null && count > 0;
+    }
+
+    private void markPendingPaymentWaitingAdmin(Integer maThanhToan) {
+        jdbcTemplate.update("""
+                UPDATE thanh_toan_cho_duyet
+                SET trang_thai = ?,
+                    thoi_gian_yeu_cau = CURRENT_TIMESTAMP
+                WHERE ma_thanh_toan = ?
+                """, TRANG_THAI_CHO_ADMIN, maThanhToan);
+    }
+
+    private void markPendingPaymentProcessed(Integer maThanhToan, String status) {
+        jdbcTemplate.update("""
+                UPDATE thanh_toan_cho_duyet
+                SET trang_thai = ?,
+                    thoi_gian_xu_ly = CURRENT_TIMESTAMP
+                WHERE ma_thanh_toan = ?
+                """, status, maThanhToan);
+    }
+
+    private String getPendingStatus(Integer maThanhToan) {
+        List<String> values = jdbcTemplate.queryForList(
+                "SELECT trang_thai FROM thanh_toan_cho_duyet WHERE ma_thanh_toan = ?",
+                String.class,
+                maThanhToan
+        );
+
+        return values.isEmpty() ? "" : values.get(0);
+    }
+
+    private LocalDateTime getPendingRequestedAt(Integer maThanhToan) {
+        List<LocalDateTime> values = jdbcTemplate.queryForList(
+                "SELECT thoi_gian_yeu_cau FROM thanh_toan_cho_duyet WHERE ma_thanh_toan = ?",
+                LocalDateTime.class,
+                maThanhToan
+        );
+
+        return values.isEmpty() ? null : values.get(0);
     }
 
     private Double tinhGiaVe(Ghe ghe) {

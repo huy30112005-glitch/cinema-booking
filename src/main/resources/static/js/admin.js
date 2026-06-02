@@ -23,6 +23,7 @@ loadTheLoai();
 loadPhong();
 loadSuatChieu();
 loadThongTinChuyenKhoan();
+loadThanhToanChoDuyet();
 loadBanner();
 hienThiMucAdmin("ticket", false);
 
@@ -431,6 +432,122 @@ function luuThongTinChuyenKhoan() {
             console.log(err);
             alert(err.message || "Lưu thông tin chuyển khoản thất bại");
 
+        });
+
+}
+
+function loadThanhToanChoDuyet() {
+
+    fetch("/payment/admin/pending-bank", {
+        credentials: "include"
+    })
+        .then(async res => {
+            if (!res.ok) {
+                const message = await res.text();
+                throw new Error(message);
+            }
+
+            return res.json();
+        })
+        .then(data => {
+            renderThanhToanChoDuyet(data);
+        })
+        .catch(err => {
+            console.log(err);
+
+            const container = document.getElementById("dsThanhToanChoDuyet");
+
+            if (container) {
+                container.innerHTML = `<p class="muted">Không tải được danh sách thanh toán chờ duyệt</p>`;
+            }
+        });
+
+}
+
+function renderThanhToanChoDuyet(data) {
+
+    const container = document.getElementById("dsThanhToanChoDuyet");
+
+    if (!container) {
+        return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        container.innerHTML = `<p class="muted">Chưa có thanh toán chờ duyệt</p>`;
+        return;
+    }
+
+    container.innerHTML = data.map(item => `
+        <div class="movie">
+            <h3>Thanh toán #${item.maThanhToan}</h3>
+
+            <p><b>Đơn hàng:</b> ${item.maDonHang || ""}</p>
+            <p><b>Khách hàng:</b> ${item.khachHang || ""}</p>
+            <p><b>Email:</b> ${item.email || ""}</p>
+            <p><b>Phim:</b> ${item.phim || ""}</p>
+            <p><b>Suất chiếu:</b> ${formatNgayGio(item.suatChieu)}</p>
+            <p><b>Ghế:</b> ${(item.ghe || []).join(", ")}</p>
+            <p><b>Số tiền:</b> ${formatTien(item.tongTien)}</p>
+            <p><b>Yêu cầu lúc:</b> ${formatNgayGio(item.thoiGianYeuCau)}</p>
+
+            <div class="form-actions">
+                <button class="btn-them" onclick="duyetThanhToan(${item.maThanhToan})">
+                    Xác nhận
+                </button>
+
+                <button class="btn-xoa" onclick="tuChoiThanhToan(${item.maThanhToan})">
+                    Từ chối
+                </button>
+            </div>
+        </div>
+    `).join("");
+
+}
+
+function duyetThanhToan(maThanhToan) {
+
+    if (!confirm(`Xác nhận thanh toán #${maThanhToan} và phát hành vé?`)) {
+        return;
+    }
+
+    xuLyThanhToanChoDuyet(`/payment/admin/${maThanhToan}/approve`, "Đã xác nhận thanh toán và phát hành vé");
+
+}
+
+function tuChoiThanhToan(maThanhToan) {
+
+    if (!confirm(`Từ chối thanh toán #${maThanhToan}? Ghế sẽ được nhả.`)) {
+        return;
+    }
+
+    xuLyThanhToanChoDuyet(`/payment/admin/${maThanhToan}/reject`, "Đã từ chối thanh toán");
+
+}
+
+function xuLyThanhToanChoDuyet(url, successMessage) {
+
+    fetch(url, {
+        method: "POST",
+        credentials: "include"
+    })
+        .then(async res => {
+            if (!res.ok) {
+                const contentType = res.headers.get("content-type") || "";
+                const message = contentType.includes("application/json")
+                    ? (await res.json()).message
+                    : await res.text();
+                throw new Error(message);
+            }
+
+            return res.json();
+        })
+        .then(() => {
+            alert(successMessage);
+            loadThanhToanChoDuyet();
+        })
+        .catch(err => {
+            console.log(err);
+            alert(err.message || "Không xử lý được thanh toán");
         });
 
 }
@@ -1135,6 +1252,15 @@ function formatNgayGio(value) {
         month: "2-digit",
         year: "numeric"
     });
+
+}
+
+function formatTien(value) {
+
+    return new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND"
+    }).format(value || 0);
 
 }
 

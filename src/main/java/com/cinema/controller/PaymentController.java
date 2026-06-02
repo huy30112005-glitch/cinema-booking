@@ -76,6 +76,39 @@ public class PaymentController {
         return paymentService.confirmSuccess(request, session);
     }
 
+    @GetMapping("/admin/pending-bank")
+    public ResponseEntity<?> pendingBankPayments(HttpSession session) {
+        if (!isAdmin(session)) {
+            return ResponseEntity.status(403).body("Chỉ admin được xem thanh toán chờ duyệt");
+        }
+
+        return paymentService.getPendingBankPayments();
+    }
+
+    @PostMapping("/admin/{maThanhToan}/approve")
+    public ResponseEntity<?> approveBankPayment(
+            @PathVariable Integer maThanhToan,
+            HttpSession session) {
+
+        if (!isAdmin(session)) {
+            return ResponseEntity.status(403).body("Chỉ admin được xác nhận thanh toán");
+        }
+
+        return paymentService.approveBankPayment(maThanhToan);
+    }
+
+    @PostMapping("/admin/{maThanhToan}/reject")
+    public ResponseEntity<?> rejectBankPayment(
+            @PathVariable Integer maThanhToan,
+            HttpSession session) {
+
+        if (!isAdmin(session)) {
+            return ResponseEntity.status(403).body("Chỉ admin được từ chối thanh toán");
+        }
+
+        return paymentService.rejectBankPayment(maThanhToan);
+    }
+
     @GetMapping("/momo-return")
     public ResponseEntity<String> momoReturn(@RequestParam Map<String, String> params) {
         return paymentService.handleMomoReturn(params);
