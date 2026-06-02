@@ -80,7 +80,7 @@ function kiemTraDangNhap() {
 function xoaTrangThaiVuaDangNhap() {
 
     if (window.location.search.includes("login=success")) {
-        window.history.replaceState({}, document.title, "index.html");
+        window.history.replaceState({}, document.title, "/index.html");
     }
 
 }
@@ -289,7 +289,7 @@ function thuMoDatVeDangCho() {
     const maPhim = maPhimDangChoDat;
     maPhimDangChoDat = null;
     sessionStorage.removeItem("pendingBookingMovieId");
-    window.history.replaceState({}, document.title, "index.html#datVePanel");
+    window.history.replaceState({}, document.title, "/index.html#datVePanel");
     chonPhim(maPhim);
 
 }
@@ -1095,7 +1095,7 @@ function dangXuat() {
         method: "POST",
         credentials: "include"
     }).finally(() => {
-        window.location.href = "index.html";
+        window.location.href = "/index.html";
     });
 
 }

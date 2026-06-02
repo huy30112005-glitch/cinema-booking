@@ -16,7 +16,7 @@
         <p class="muted">Xác nhận thanh toán để hệ thống phát hành vé</p>
     </div>
 
-    <button class="btn-xoa" onclick="window.location.href='index.html'">
+    <button class="btn-xoa" onclick="window.location.href='/index.html'">
         Quay lại
     </button>
 </div>
@@ -84,7 +84,7 @@
             Thanh toán thành công
         </button>
 
-        <button class="btn-xoa" onclick="window.location.href='index.html'">
+        <button class="btn-xoa" onclick="window.location.href='/index.html'">
             Hủy
         </button>
     </div>
@@ -99,7 +99,7 @@
 
     if (!maThanhToan) {
         alert("Thiếu mã thanh toán");
-        window.location.href = "index.html";
+        window.location.href = "/index.html";
     }
 
     taiThongTinThanhToan();
@@ -130,7 +130,7 @@
             })
             .catch(err => {
                 alert(err.message || "Không tải được thanh toán");
-                window.location.href = "index.html";
+                window.location.href = "/index.html";
             });
     }
 
@@ -191,7 +191,7 @@
     function xacNhanThanhToan() {
         if (thongTinThanhToan?.giuDen && Date.now() >= thongTinThanhToan.giuDen) {
             alert("Thời gian thanh toán đã hết. Vui lòng chọn lại ghế");
-            window.location.href = "index.html";
+            window.location.href = "/index.html";
             return;
         }
 
@@ -218,7 +218,7 @@
                 const dsVe = Array.isArray(ve) ? ve : [ve];
                 const maVe = dsVe.map(item => item.maVe).filter(Boolean).join(", ");
                 alert(`Thanh toán thành công. Mã vé: ${maVe}`);
-                window.location.href = "index.html";
+                window.location.href = "/index.html";
             })
             .catch(err => {
                 alert(err.message || "Thanh toán thất bại");

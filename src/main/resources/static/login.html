@@ -155,7 +155,7 @@
                         if (vaiTro === "ADMIN") {
                             window.location.href = "admin.html";
                         } else {
-                            window.location.href = "index.html?login=success";
+                            window.location.href = "/index.html?login=success";
                         }
                     } else {
 
@@ -218,7 +218,7 @@
 
                     if (user && user.maNguoiDung) {
                         localStorage.setItem("user", JSON.stringify(user));
-                        window.location.href = "index.html?login=success";
+                        window.location.href = "/index.html?login=success";
                     } else {
                         alert("Tạo tài khoản thất bại");
                     }

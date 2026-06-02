@@ -14,7 +14,7 @@ if (user == null) {
 }
 
 if (!laAdmin(user)) {
-    window.location.href = "index.html";
+    window.location.href = "/index.html";
 }
 
 hienThiPhim();

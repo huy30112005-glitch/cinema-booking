@@ -927,7 +927,7 @@ function xuLyTaiKhoan() {
         localStorage.removeItem("user");
         user = null;
         capNhatTrangThaiDangNhap();
-        window.location.href = "index.html";
+        window.location.href = "/index.html";
     });
 
 }
