@@ -167,6 +167,7 @@ public class PaymentService {
                         servletRequest
                 );
             } catch (IllegalStateException e) {
+                heldSeats.forEach(maGhe -> seatHoldService.release(request.getMaSuatChieu(), maGhe));
                 return ResponseEntity.internalServerError()
                         .body(new ApiResponse(false, e.getMessage()));
             }
