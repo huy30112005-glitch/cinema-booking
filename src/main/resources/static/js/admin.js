@@ -25,6 +25,7 @@ loadSuatChieu();
 loadThongTinChuyenKhoan();
 loadThanhToanChoDuyet();
 loadBanner();
+initBaoCaoThongKe();
 hienThiMucAdmin("ticket", false);
 
 function laAdmin(user) {
@@ -433,6 +434,136 @@ function luuThongTinChuyenKhoan() {
             alert(err.message || "Lưu thông tin chuyển khoản thất bại");
 
         });
+
+}
+
+function initBaoCaoThongKe() {
+
+    const tuNgay = document.getElementById("baoCaoTuNgay");
+    const denNgay = document.getElementById("baoCaoDenNgay");
+
+    if (!tuNgay || !denNgay) {
+        return;
+    }
+
+    const today = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(today.getDate() - 29);
+
+    tuNgay.value = formatDateInput(fromDate);
+    denNgay.value = formatDateInput(today);
+    loadBaoCaoThongKe();
+
+}
+
+function loadBaoCaoThongKe() {
+
+    const tuNgay = document.getElementById("baoCaoTuNgay")?.value || "";
+    const denNgay = document.getElementById("baoCaoDenNgay")?.value || "";
+    const params = new URLSearchParams();
+
+    if (tuNgay) {
+        params.set("fromDate", tuNgay);
+    }
+
+    if (denNgay) {
+        params.set("toDate", denNgay);
+    }
+
+    fetch(`/admin/report?${params.toString()}`, {
+        credentials: "include"
+    })
+        .then(async res => {
+            if (!res.ok) {
+                const message = await res.text();
+                throw new Error(message);
+            }
+
+            return res.json();
+        })
+        .then(data => {
+            renderBaoCaoThongKe(data);
+        })
+        .catch(err => {
+            console.log(err);
+            document.getElementById("tongQuanBaoCao").innerHTML =
+                `<p class="muted">Không tải được báo cáo thống kê</p>`;
+        });
+
+}
+
+function renderBaoCaoThongKe(data) {
+
+    const summary = data.summary || {};
+    const topMovies = Array.isArray(data.topMovies) ? data.topMovies : [];
+    const dailyRevenue = Array.isArray(data.dailyRevenue) ? data.dailyRevenue : [];
+
+    document.getElementById("tongQuanBaoCao").innerHTML = `
+        <div class="movie">
+            <h3>Doanh thu</h3>
+            <p class="report-number">${formatTien(summary.revenue)}</p>
+        </div>
+
+        <div class="movie">
+            <h3>Vé đã bán</h3>
+            <p class="report-number">${summary.ticketCount || 0}</p>
+        </div>
+
+        <div class="movie">
+            <h3>Đơn đã thanh toán</h3>
+            <p class="report-number">${summary.orderCount || 0}</p>
+        </div>
+
+        <div class="movie">
+            <h3>Chờ duyệt</h3>
+            <p class="report-number">${summary.pendingPaymentCount || 0}</p>
+        </div>
+    `;
+
+    document.getElementById("topPhimBaoCao").innerHTML =
+        topMovies.length > 0
+            ? renderBaoCaoTable(
+                    ["Phim", "Số vé", "Doanh thu"],
+                    topMovies.map(item => [
+                        item.tenPhim || "",
+                        item.soVe || 0,
+                        formatTien(item.doanhThu)
+                    ])
+            )
+            : `<p class="muted">Chưa có dữ liệu phim bán chạy</p>`;
+
+    document.getElementById("doanhThuNgayBaoCao").innerHTML =
+        dailyRevenue.length > 0
+            ? renderBaoCaoTable(
+                    ["Ngày", "Số vé", "Doanh thu"],
+                    dailyRevenue.map(item => [
+                        formatNgay(item.ngay),
+                        item.soVe || 0,
+                        formatTien(item.doanhThu)
+                    ])
+            )
+            : `<p class="muted">Chưa có dữ liệu doanh thu theo ngày</p>`;
+
+}
+
+function renderBaoCaoTable(headers, rows) {
+
+    return `
+        <table class="admin-report-table">
+            <thead>
+                <tr>
+                    ${headers.map(header => `<th>${header}</th>`).join("")}
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(row => `
+                    <tr>
+                        ${row.map(cell => `<td>${cell}</td>`).join("")}
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
 
 }
 
@@ -1261,6 +1392,30 @@ function formatTien(value) {
         style: "currency",
         currency: "VND"
     }).format(value || 0);
+
+}
+
+function formatNgay(value) {
+
+    if (!value) {
+        return "";
+    }
+
+    return new Date(`${value}T00:00:00`).toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
+
+}
+
+function formatDateInput(date) {
+
+    let nam = date.getFullYear();
+    let thang = String(date.getMonth() + 1).padStart(2, "0");
+    let ngay = String(date.getDate()).padStart(2, "0");
+
+    return `${nam}-${thang}-${ngay}`;
 
 }
 

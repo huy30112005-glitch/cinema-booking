@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản trị rạp phim</title>
-    <link rel="stylesheet" href="css/style.css?v=admin-payment-review-1">
+    <link rel="stylesheet" href="css/style.css?v=admin-report-1">
 </head>
 <body class="app-shell admin-page">
 
@@ -21,6 +21,7 @@
 
     <nav class="nav-links" aria-label="Điều hướng quản trị">
         <a href="#formKiemVe" class="admin-nav-link active" onclick="hienThiMucAdmin('ticket')">Kiểm vé</a>
+        <a href="#formBaoCao" class="admin-nav-link" onclick="hienThiMucAdmin('report')">Báo cáo</a>
         <a href="#formDuyetThanhToan" class="admin-nav-link" onclick="hienThiMucAdmin('payment-review')">Duyệt thanh toán</a>
         <a href="#formChuyenKhoan" class="admin-nav-link" onclick="hienThiMucAdmin('payment')">Chuyển khoản</a>
         <a href="#formBanner" class="admin-nav-link" onclick="hienThiMucAdmin('banner')">Banner</a>
@@ -84,6 +85,45 @@
                     <p id="qrScannerStatus" class="muted">
                         Camera chưa bật
                     </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="form admin-panel admin-panel-wide admin-section hidden" id="formBaoCao" data-admin-section="report">
+            <div class="booking-header">
+                <div>
+                    <h2>Báo cáo thống kê</h2>
+                    <p class="muted">Theo dõi doanh thu, số vé bán và phim bán chạy theo khoảng ngày.</p>
+                </div>
+
+                <button class="btn-sua" onclick="loadBaoCaoThongKe()">
+                    Tải báo cáo
+                </button>
+            </div>
+
+            <div class="form-grid">
+                <div>
+                    <label for="baoCaoTuNgay">Từ ngày</label>
+                    <input type="date" id="baoCaoTuNgay">
+                </div>
+
+                <div>
+                    <label for="baoCaoDenNgay">Đến ngày</label>
+                    <input type="date" id="baoCaoDenNgay">
+                </div>
+            </div>
+
+            <div id="tongQuanBaoCao" class="movie-grid"></div>
+
+            <div class="admin-report-grid">
+                <div>
+                    <h3>Top phim bán chạy</h3>
+                    <div id="topPhimBaoCao" class="admin-list"></div>
+                </div>
+
+                <div>
+                    <h3>Doanh thu theo ngày</h3>
+                    <div id="doanhThuNgayBaoCao" class="admin-list"></div>
                 </div>
             </div>
         </section>
@@ -260,7 +300,7 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-<script src="js/admin.js?v=admin-payment-review-1"></script>
+<script src="js/admin.js?v=admin-report-1"></script>
 
 </body>
 </html>

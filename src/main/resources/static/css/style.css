@@ -1395,6 +1395,49 @@
             gap:16px;
         }
 
+        .admin-report-grid{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(280px, 1fr));
+            gap:18px;
+            margin-top:22px;
+        }
+
+        .admin-report-grid h3{
+            margin:0 0 12px;
+        }
+
+        .admin-report-table{
+            width:100%;
+            border-collapse:collapse;
+            background:#141414;
+            border:1px solid #333;
+            border-radius:8px;
+            overflow:hidden;
+        }
+
+        .admin-report-table th,
+        .admin-report-table td{
+            padding:12px 14px;
+            border-bottom:1px solid #333;
+            text-align:left;
+        }
+
+        .admin-report-table th{
+            color:#aaa;
+            font-weight:700;
+        }
+
+        .admin-report-table tr:last-child td{
+            border-bottom:0;
+        }
+
+        .report-number{
+            color:#ffeb00;
+            font-size:24px;
+            font-weight:800;
+            margin-bottom:0;
+        }
+
         .ticket-check-layout{
             display:grid;
             grid-template-columns:minmax(280px, 1fr) minmax(280px, 420px);
@@ -1649,6 +1692,7 @@
             }
 
             .admin-grid,
+            .admin-report-grid,
             .form-grid,
             .ticket-check-layout{
                 grid-template-columns:1fr;
