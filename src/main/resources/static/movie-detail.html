@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chi tiết phim</title>
+    <link rel="stylesheet" href="css/style.css?v=admin-tabs-1">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        referrerpolicy="no-referrer"
+    >
+</head>
+<body class="app-shell">
+
+<header class="app-nav">
+    <div class="brand-block">
+        <a href="index.html" aria-label="CKB Cinema">
+            <img class="brand-logo" src="image/logo.png" alt="CKB Cinema">
+        </a>
+    </div>
+
+    <nav class="nav-links" aria-label="Điều hướng chính">
+        <a href="index.html#dsPhim">Phim</a>
+        <a href="index.html#datVePanel">Lịch chiếu</a>
+        <a href="index.html#bannerPhim">Rạp</a>
+        <a href="index.html#dsPhim">Ưu đãi</a>
+        <a href="index.html#datVePanel">Giỏ hàng</a>
+    </nav>
+
+    <div class="topbar-actions">
+        <button id="authButton" class="btn-xoa" onclick="xuLyTaiKhoan()">
+            Đăng nhập
+        </button>
+
+        <button id="profileButton" class="btn-sua hidden" onclick="moThongTinCaNhan()">
+            Thông tin cá nhân
+        </button>
+    </div>
+</header>
+
+<main class="page-content">
+    <div class="detail-breadcrumb">
+        <a href="index.html">Trang chủ</a>
+        <span>/</span>
+        <a href="index.html#dsPhim">Phim</a>
+        <span>/</span>
+        <strong id="breadcrumbTitle">Chi tiết phim</strong>
+    </div>
+
+    <section id="movieDetail" class="movie-detail-panel">
+        <p class="muted">Đang tải chi tiết phim...</p>
+    </section>
+
+    <input type="hidden" id="maSuatChieu">
+
+    <div id="seatModal" class="seat-modal hidden">
+        <div class="seat-modal-box">
+            <button class="seat-modal-close" onclick="dongSeatModal()" aria-label="Đóng">
+                &times;
+            </button>
+
+            <div id="dsGhe" class="seat-grid"></div>
+
+            <div class="seat-modal-footer">
+                <h3>Tạm tính: <span id="tamTinhGhe">0 đ</span></h3>
+                <button class="btn-them" onclick="xacNhanDatVe()">
+                    Xác nhận
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div>
+        <a href="index.html" aria-label="CKB Cinema">
+            <img class="footer-logo" src="image/logo.png" alt="CKB Cinema">
+        </a>
+        <p>
+            CKB Cinema là hệ thống rạp phim hiện đại,
+            mang đến trải nghiệm điện ảnh chất lượng cao.
+        </p>
+    </div>
+
+    <div>
+        <h3>Khám phá</h3>
+        <p><a href="#">Về chúng tôi</a></p>
+        <p><a href="#">Hệ thống rạp</a></p>
+        <p><a href="#">Tuyển dụng</a></p>
+    </div>
+
+    <div>
+        <h3>Chính sách hỗ trợ</h3>
+        <p><a href="#">Chăm sóc khách hàng</a></p>
+        <p><a href="#">Chính sách bảo mật</a></p>
+        <p><a href="#">Điều khoản sử dụng</a></p>
+    </div>
+
+    <div>
+        <h3>Kết nối với chúng tôi</h3>
+        <div class="social">
+            <a href="https://www.facebook.com/tran.ngoc.huy.463696" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                <i class="fa-brands fa-facebook"></i>
+            </a>
+            <a href="https://www.instagram.com/khoi.109/?hl=en" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                <i class="fa-brands fa-instagram"></i>
+            </a>
+            <a href="https://www.tiktok.com/@hudkshdv" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+                <i class="fa-brands fa-tiktok"></i>
+            </a>
+            <a href="https://www.youtube.com/@NMK-vb4oi" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+                <i class="fa-brands fa-youtube"></i>
+            </a>
+        </div>
+    </div>
+</footer>
+
+<script src="js/movie-detail.js?v=admin-tabs-1"></script>
+
+</body>
+</html>

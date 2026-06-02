@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rạp phim</title>
+    <link rel="stylesheet" href="css/style.css?v=greeting-nav-2">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        referrerpolicy="no-referrer"
+    >
+</head>
+<body class="app-shell">
+
+<header class="app-nav">
+    <div class="brand-block">
+      <img class="brand-logo" src="image/logo.png" alt="CKB Cinema">
+    </div>
+
+    <nav class="nav-links" aria-label="Điều hướng chính">
+        <a href="#dsPhim" onclick="hienThiTatCaPhim()">Phim</a>
+        <a href="#datVePanel">Lịch chiếu</a>
+        <a href="#bannerPhim">Rạp</a>
+        <a href="#dsPhim">Ưu đãi</a>
+        <a href="#datVePanel">Giỏ hàng</a>
+    </nav>
+
+    <div class="topbar-actions">
+        <p id="loiChao" class="nav-greeting"></p>
+
+        <button id="authButton" class="btn-xoa" onclick="xuLyTaiKhoan()">
+            Đăng nhập
+        </button>
+
+        <button id="profileButton" class="btn-sua hidden" onclick="moThongTinCaNhan()">
+            Thông tin cá nhân
+        </button>
+    </div>
+</header>
+
+<main class="page-content">
+    <section class="home-tools">
+        <div class="user-panel">
+            <input
+                type="text"
+                id="tuKhoaPhim"
+                placeholder="Tìm phim theo tên, thể loại hoặc định dạng"
+                oninput="locPhim()"
+            >
+        </div>
+    </section>
+
+    <section id="bannerPhim" class="movie-banner hidden"></section>
+
+    <section id="datVePanel" class="booking-panel hidden">
+        <div class="booking-header">
+            <div>
+                <h2 id="tenPhimDangChon">Đặt vé</h2>
+                <p id="thongTinDatVe" class="muted"></p>
+            </div>
+
+            <button class="btn-xoa" onclick="dongDatVe()">
+                Đóng
+            </button>
+        </div>
+
+        <label>Lịch chiếu</label>
+        <input type="hidden" id="maSuatChieu">
+        <div id="lichChieuDatVe" class="booking-showtime-list"></div>
+
+    </section>
+
+    <div id="seatModal" class="seat-modal hidden">
+        <div class="seat-modal-box">
+            <button class="seat-modal-close" onclick="dongSeatModal()" aria-label="Đóng">
+                &times;
+            </button>
+
+            <div id="dsGhe" class="seat-grid"></div>
+
+            <div class="seat-modal-footer">
+                <h3>Tạm tính: <span id="tamTinhGhe">0 đ</span></h3>
+                <button class="btn-them" onclick="xacNhanDatVe()">
+                    Xác nhận
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <section class="content-section">
+        <div class="section-title">
+            <h2 id="tieuDeDanhSachPhim">Phim đang chiếu</h2>
+            <button
+                id="btnXemTatCaPhim"
+                class="section-link-button"
+                onclick="hienThiTatCaPhim()"
+            >
+                Xem tất cả
+            </button>
+        </div>
+
+        <div id="dsPhim" class="movie-grid"></div>
+    </section>
+</main>
+
+<footer class="site-footer">
+    <div>
+        <h3>CKB Cinema</h3>
+        <p>
+            CKB Cinema là hệ thống rạp phim hiện đại,
+            mang đến trải nghiệm điện ảnh chất lượng cao.
+        </p>
+    </div>
+
+    <div>
+        <h3>Khám phá</h3>
+        <p><a href="#">Về chúng tôi</a></p>
+        <p><a href="#">Hệ thống rạp</a></p>
+        <p><a href="#">Tuyển dụng</a></p>
+    </div>
+
+    <div>
+        <h3>Chính sách hỗ trợ</h3>
+        <p><a href="#">Chăm sóc khách hàng</a></p>
+        <p><a href="#">Chính sách bảo mật</a></p>
+        <p><a href="#">Điều khoản sử dụng</a></p>
+    </div>
+
+    <div>
+        <h3>Kết nối với chúng tôi</h3>
+        <div class="social">
+            <a href="https://www.facebook.com/tran.ngoc.huy.463696" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+                <i class="fa-brands fa-facebook"></i>
+            </a>
+            <a href="https://www.instagram.com/khoi.109/?hl=en" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                <i class="fa-brands fa-instagram"></i>
+            </a>
+            <a href="https://www.tiktok.com/@hudkshdv" target="_blank" rel="noopener noreferrer" aria-label="TikTok">
+                <i class="fa-brands fa-tiktok"></i>
+            </a>
+            <a href="https://www.youtube.com/@NMK-vb4oi" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+                <i class="fa-brands fa-youtube"></i>
+            </a>
+        </div>
+    </div>
+</footer>
+
+<script src="js/user.js?v=greeting-nav-1"></script>
+
+</body>
+</html>

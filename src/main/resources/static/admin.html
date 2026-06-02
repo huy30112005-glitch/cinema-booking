@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản trị rạp phim</title>
+    <link rel="stylesheet" href="css/style.css?v=admin-ticket-check-3">
+</head>
+<body class="app-shell admin-page">
+
+<header class="app-nav">
+    <div class="brand-block">
+        <a href="index.html" aria-label="Về trang chủ">
+            <img class="brand-logo" src="image/logo.png" alt="CKB Cinema">
+        </a>
+        <div>
+            <h1>Quản trị rạp phim</h1>
+            <p class="muted">Quản lý phim, suất chiếu, banner và thanh toán.</p>
+        </div>
+    </div>
+
+    <nav class="nav-links" aria-label="Điều hướng quản trị">
+        <a href="#formKiemVe" class="admin-nav-link active" onclick="hienThiMucAdmin('ticket')">Kiểm vé</a>
+        <a href="#formChuyenKhoan" class="admin-nav-link" onclick="hienThiMucAdmin('payment')">Chuyển khoản</a>
+        <a href="#formBanner" class="admin-nav-link" onclick="hienThiMucAdmin('banner')">Banner</a>
+        <a href="#formPhim" class="admin-nav-link" onclick="hienThiMucAdmin('movie')">Phim</a>
+        <a href="#formSuatChieu" class="admin-nav-link" onclick="hienThiMucAdmin('showtime')">Suất chiếu</a>
+    </nav>
+
+    <div class="topbar-actions">
+        <button class="btn-xoa" onclick="dangXuat()">
+            Đăng xuất
+        </button>
+    </div>
+</header>
+
+<main class="page-content">
+    <section class="page-heading">
+        <div>
+            <h2>Bảng điều khiển</h2>
+            <p class="muted">Các tác vụ quản trị được gom theo từng nhóm để thao tác nhanh hơn.</p>
+        </div>
+    </section>
+
+    <div class="admin-grid">
+        <section class="form admin-panel admin-panel-wide admin-section" id="formKiemVe" data-admin-section="ticket">
+            <h2>Kiểm vé bằng mã QR</h2>
+
+            <div class="ticket-check-layout">
+                <div>
+                    <label for="maQrVe">Nội dung mã QR hoặc mã vé</label>
+                    <input
+                        type="text"
+                        id="maQrVe"
+                        placeholder="Ví dụ: VE:12|PHIM:... hoặc 12"
+                    >
+
+                    <div class="form-actions">
+                        <button class="btn-sua" onclick="traCuuVe()">
+                            Tra cứu
+                        </button>
+
+                        <button class="btn-them" onclick="xacNhanSuDungVe()">
+                            Xác nhận sử dụng
+                        </button>
+
+                        <button class="btn-sua" onclick="batDauQuetQr()">
+                            Bật camera
+                        </button>
+
+                        <button class="btn-xoa" onclick="dungQuetQr()">
+                            Tắt camera
+                        </button>
+                    </div>
+
+                    <div id="ketQuaKiemVe" class="ticket-check-result muted">
+                        Chưa kiểm tra vé
+                    </div>
+                </div>
+
+                <div class="ticket-scanner-box">
+                    <video id="qrScannerVideo" playsinline muted></video>
+                    <p id="qrScannerStatus" class="muted">
+                        Camera chưa bật
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="form admin-panel admin-section hidden" id="formChuyenKhoan" data-admin-section="payment">
+            <h2>Thông tin chuyển khoản</h2>
+
+            <label for="maNganHang">Ngân hàng</label>
+            <select id="maNganHang">
+                <option value="">-- Chọn ngân hàng --</option>
+                <option value="VCB" data-name="Vietcombank">Vietcombank</option>
+                <option value="TCB" data-name="Techcombank">Techcombank</option>
+                <option value="MB" data-name="MB Bank">MB Bank</option>
+                <option value="ACB" data-name="ACB">ACB</option>
+                <option value="BIDV" data-name="BIDV">BIDV</option>
+                <option value="VIB" data-name="VIB">VIB</option>
+                <option value="VPB" data-name="VPBank">VPBank</option>
+                <option value="TPB" data-name="TPBank">TPBank</option>
+                <option value="STB" data-name="Sacombank">Sacombank</option>
+                <option value="HDB" data-name="HDBank">HDBank</option>
+                <option value="OCB" data-name="OCB">OCB</option>
+                <option value="MSB" data-name="MSB">MSB</option>
+                <option value="SHB" data-name="SHB">SHB</option>
+                <option value="EIB" data-name="Eximbank">Eximbank</option>
+            </select>
+
+            <label for="tenTaiKhoan">Tên tài khoản</label>
+            <input type="text" id="tenTaiKhoan" placeholder="Ví dụ: NGUYEN VAN A">
+
+            <label for="soTaiKhoan">Số tài khoản</label>
+            <input type="text" id="soTaiKhoan" placeholder="Ví dụ: 123456789">
+
+            <button class="btn-them" onclick="luuThongTinChuyenKhoan()">
+                Lưu thông tin
+            </button>
+        </section>
+
+        <section class="form admin-panel admin-section hidden" id="formBanner" data-admin-section="banner">
+            <h2>Quản lý banner</h2>
+
+            <label for="bannerImage">Ảnh banner</label>
+            <input type="file" id="bannerImage" accept="image/*">
+
+            <label for="bannerThuTu">Thứ tự</label>
+            <input type="number" id="bannerThuTu" placeholder="Ví dụ: 1">
+
+            <button class="btn-them" onclick="themBanner()">
+                Thêm banner
+            </button>
+        </section>
+
+        <section class="form admin-panel admin-panel-wide admin-section hidden" id="formPhim" data-admin-section="movie">
+            <h2>Quản lý phim</h2>
+
+            <input type="hidden" id="maPhim">
+
+            <div class="form-grid">
+                <div>
+                    <label for="tenPhim">Tên phim</label>
+                    <input type="text" id="tenPhim" placeholder="Tên phim">
+                </div>
+
+                <div>
+                    <label for="thoiLuong">Thời lượng</label>
+                    <input type="number" id="thoiLuong" placeholder="Số phút">
+                </div>
+
+                <div>
+                    <label for="doTuoi">Độ tuổi</label>
+                    <input type="text" id="doTuoi" placeholder="VD: P, 13+, 16+">
+                </div>
+
+                <div>
+                    <label for="trailer">Trailer</label>
+                    <input type="text" id="trailer" placeholder="Link YouTube hoặc mã video">
+                </div>
+
+                <div>
+                    <label for="poster">Ảnh poster</label>
+                    <input type="file" id="poster" accept="image/*">
+                </div>
+
+                <div>
+                    <label for="maDinhDang">Định dạng</label>
+                    <select id="maDinhDang">
+                        <option value="">-- Chọn định dạng --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="maTheLoai">Thể loại</label>
+                    <select id="maTheLoai">
+                        <option value="">-- Chọn thể loại --</option>
+                    </select>
+                </div>
+            </div>
+
+            <label for="moTa">Mô tả</label>
+            <input type="text" id="moTa" placeholder="Mô tả">
+
+            <p id="posterHienTai" class="muted"></p>
+
+            <div class="form-actions">
+                <button class="btn-them" onclick="themPhim()">
+                    Thêm phim
+                </button>
+
+                <button class="btn-sua" onclick="capNhatPhim()">
+                    Cập nhật
+                </button>
+            </div>
+        </section>
+
+        <section class="form admin-panel admin-section hidden" id="formSuatChieu" data-admin-section="showtime">
+            <h2>Quản lý suất chiếu</h2>
+
+            <label for="scMaPhim">Phim</label>
+            <select id="scMaPhim" onchange="capNhatThoiGianKetThuc()">
+                <option value="">-- Chọn phim --</option>
+            </select>
+
+            <label for="scMaPhong">Phòng</label>
+            <select id="scMaPhong">
+                <option value="">-- Chọn phòng --</option>
+            </select>
+
+            <label for="scBatDau">Thời gian bắt đầu</label>
+            <input type="datetime-local" id="scBatDau" onchange="capNhatThoiGianKetThuc()">
+
+            <label for="scKetThuc">Thời gian kết thúc</label>
+            <input type="datetime-local" id="scKetThuc" readonly>
+
+            <button class="btn-them" onclick="themSuatChieu()">
+                Thêm suất chiếu
+            </button>
+        </section>
+    </div>
+
+    <section class="content-section admin-section hidden" id="bannerSection" data-admin-section="banner">
+        <div class="section-title">
+            <h2>Danh sách banner</h2>
+        </div>
+        <div id="dsBanner" class="admin-list"></div>
+    </section>
+
+    <section class="content-section admin-section hidden" id="suatChieuSection" data-admin-section="showtime">
+        <div class="section-title">
+            <h2>Danh sách suất chiếu</h2>
+        </div>
+        <div id="dsSuatChieu" class="admin-list"></div>
+    </section>
+
+    <section class="content-section admin-section hidden" id="dsPhimSection" data-admin-section="movie">
+        <div class="section-title">
+            <h2>Danh sách phim</h2>
+        </div>
+        <div id="dsPhim" class="movie-grid"></div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="js/admin.js?v=admin-ticket-check-3"></script>
+
+</body>
+</html>

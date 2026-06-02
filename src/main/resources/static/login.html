@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Đăng nhập</title>
+
+    <style>
+        body {
+            background: #111;
+            color: white;
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-box {
+            background: #222;
+            padding: 30px;
+            border-radius: 10px;
+            width: 350px;
+        }
+
+        h1 {
+            color: red;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background: red;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
+
+        .secondary {
+            background: #444;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="login-box">
+
+        <h1 id="formTitle">Đăng nhập</h1>
+
+        <input type="text" id="username" placeholder="Tên đăng nhập">
+
+        <input type="password" id="password" placeholder="Mật khẩu">
+
+        <input class="register-field hidden" type="email" id="email" placeholder="Email">
+
+        <input class="register-field hidden" type="text" id="sdt" placeholder="Số điện thoại">
+
+        <button id="submitButton" onclick="dangNhap()">
+            Đăng nhập
+        </button>
+
+        <button id="switchButton" class="secondary" onclick="chuyenCheDo()">
+            Tạo tài khoản
+        </button>
+
+    </div>
+
+    <script>
+        let dangKyMode = false;
+
+        function chuyenCheDo() {
+
+            dangKyMode = !dangKyMode;
+
+            document.getElementById("formTitle").innerText =
+                dangKyMode ? "Tạo tài khoản" : "Đăng nhập";
+
+            document.getElementById("submitButton").innerText =
+                dangKyMode ? "Tạo tài khoản" : "Đăng nhập";
+
+            document.getElementById("submitButton").onclick =
+                dangKyMode ? dangKy : dangNhap;
+
+            document.getElementById("switchButton").innerText =
+                dangKyMode ? "Đã có tài khoản" : "Tạo tài khoản";
+
+            document.querySelectorAll(".register-field").forEach(input => {
+                input.classList.toggle("hidden", !dangKyMode);
+            });
+
+        }
+
+        function dangNhap() {
+
+            let data = {
+
+                tenNguoiDung:
+                    document.getElementById("username").value.trim(),
+
+                matKhau:
+                    document.getElementById("password").value
+
+            };
+
+            fetch("/nguoidung/login", {
+
+                method: "POST",
+                credentials: "include",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify(data)
+
+            })
+
+                .then(async res => {
+
+                    console.log("STATUS:", res.status);
+
+                    if (!res.ok) {
+                        let message = await res.text();
+                        alert(message || "Sai tài khoản hoặc mật khẩu");
+                        return;
+                    }
+
+                    let user = await res.json();
+
+                    console.log(user);
+
+                    if (user && user.maNguoiDung) {
+
+                        localStorage.setItem("user", JSON.stringify(user));
+
+                        let vaiTro = (user.vaiTro || "").toUpperCase();
+
+                        if (vaiTro === "ADMIN") {
+                            window.location.href = "admin.html";
+                        } else {
+                            window.location.href = "index.html?login=success";
+                        }
+                    } else {
+
+                        alert("Sai tài khoản hoặc mật khẩu");
+
+                    }
+
+                })
+
+                .catch(err => {
+
+                    console.log(err);
+
+                    alert("Không kết nối được server");
+
+                });
+
+        }
+
+        function dangKy() {
+
+            let data = {
+
+                tenNguoiDung:
+                    document.getElementById("username").value.trim(),
+
+                matKhau:
+                    document.getElementById("password").value,
+
+                email:
+                    document.getElementById("email").value.trim(),
+
+                sdt:
+                    document.getElementById("sdt").value.trim()
+
+            };
+
+            fetch("/nguoidung/register", {
+
+                method: "POST",
+                credentials: "include",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify(data)
+
+            })
+
+                .then(async res => {
+
+                    if (!res.ok) {
+                        let message = await res.text();
+                        alert(message || "Tạo tài khoản thất bại");
+                        return;
+                    }
+
+                    let user = await res.json();
+
+                    if (user && user.maNguoiDung) {
+                        localStorage.setItem("user", JSON.stringify(user));
+                        window.location.href = "index.html?login=success";
+                    } else {
+                        alert("Tạo tài khoản thất bại");
+                    }
+
+                })
+
+                .catch(err => {
+
+                    console.log(err);
+                    alert("Không kết nối được server");
+
+                });
+
+        }
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thông tin cá nhân</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+<div class="topbar">
+    <div>
+        <h1>Thông tin cá nhân</h1>
+        <p id="profileGreeting" class="muted">Đang tải thông tin tài khoản...</p>
+    </div>
+
+    <div class="topbar-actions">
+        <button class="btn-xoa" onclick="window.location.href='index.html'">
+            Trang chủ
+        </button>
+
+        <button class="btn-xoa" onclick="dangXuat()">
+            Đăng xuất
+        </button>
+    </div>
+</div>
+
+<div class="profile-layout">
+    <div class="booking-panel">
+        <h2>Hồ sơ</h2>
+
+        <label for="tenNguoiDung">Tên đăng nhập</label>
+        <input id="tenNguoiDung" type="text" disabled>
+
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="Email">
+
+        <label for="sdt">Số điện thoại</label>
+        <input id="sdt" type="text" placeholder="Số điện thoại">
+
+        <button class="btn-them" onclick="capNhatHoSo()">
+            Lưu thay đổi
+        </button>
+    </div>
+
+    <div class="booking-panel">
+        <h2>Đổi mật khẩu</h2>
+
+        <label for="matKhauCu">Mật khẩu cũ</label>
+        <input id="matKhauCu" type="password" placeholder="Mật khẩu cũ">
+
+        <label for="matKhauMoi">Mật khẩu mới</label>
+        <input id="matKhauMoi" type="password" placeholder="Mật khẩu mới">
+
+        <button class="btn-sua" onclick="doiMatKhau()">
+            Đổi mật khẩu
+        </button>
+    </div>
+</div>
+
+<div class="booking-panel">
+    <div class="booking-header">
+        <div>
+            <h2>Vé của tôi</h2>
+            <p class="muted">Danh sách vé đã thanh toán trên trình duyệt này</p>
+        </div>
+    </div>
+
+    <div id="dsVe" class="ticket-grid"></div>
+</div>
+
+<script>
+    let user = null;
+
+    kiemTraDangNhap();
+
+    function kiemTraDangNhap() {
+        fetch("/nguoidung/me", {
+            credentials: "include"
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    localStorage.removeItem("user");
+                    window.location.href = "login.html";
+                    return;
+                }
+
+                user = await res.json();
+                localStorage.setItem("user", JSON.stringify(user));
+                hienThiHoSo();
+                hienThiVe();
+            })
+            .catch(() => {
+                alert("Không kết nối được server");
+                window.location.href = "index.html";
+            });
+    }
+
+    function hienThiHoSo() {
+        document.getElementById("profileGreeting").innerText =
+            `Xin chào, ${user.tenNguoiDung}`;
+        document.getElementById("tenNguoiDung").value = user.tenNguoiDung || "";
+        document.getElementById("email").value = user.email || "";
+        document.getElementById("sdt").value = user.sdt || "";
+    }
+
+    function capNhatHoSo() {
+        fetch("/nguoidung/me", {
+            method: "PUT",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                email: document.getElementById("email").value.trim(),
+                sdt: document.getElementById("sdt").value.trim()
+            })
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    throw new Error(await res.text() || "Cập nhật thất bại");
+                }
+
+                return res.json();
+            })
+            .then(data => {
+                user = data;
+                localStorage.setItem("user", JSON.stringify(user));
+                hienThiHoSo();
+                alert("Đã cập nhật thông tin");
+            })
+            .catch(err => {
+                alert(err.message || "Cập nhật thất bại");
+            });
+    }
+
+    function doiMatKhau() {
+        fetch("/nguoidung/password", {
+            method: "PUT",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                matKhauCu: document.getElementById("matKhauCu").value,
+                matKhauMoi: document.getElementById("matKhauMoi").value
+            })
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    throw new Error(await res.text() || "Đổi mật khẩu thất bại");
+                }
+
+                document.getElementById("matKhauCu").value = "";
+                document.getElementById("matKhauMoi").value = "";
+                alert("Đã đổi mật khẩu");
+            })
+            .catch(err => {
+                alert(err.message || "Đổi mật khẩu thất bại");
+            });
+    }
+
+    function hienThiVe() {
+        const tickets = layVeCuaToi();
+        const dsVe = document.getElementById("dsVe");
+
+        if (tickets.length === 0) {
+            dsVe.innerHTML = `<p class="muted">Bạn chưa có vé nào được lưu trên trình duyệt này.</p>`;
+            return;
+        }
+
+        dsVe.innerHTML = tickets.map(ve => `
+            <div class="ticket-card">
+                <h3>Vé #${ve.maVe}</h3>
+                <p><b>Phim:</b> ${ve.tenPhim || "Chưa có thông tin"}</p>
+                <p><b>Suất chiếu:</b> ${formatNgayGio(ve.thoiGianBatDau)}</p>
+                <p><b>Phòng:</b> ${ve.tenPhong || "Chưa có thông tin"}</p>
+                <p><b>Ghế:</b> ${ve.soGhe || ""}</p>
+                <p><b>Giá:</b> ${formatTien(ve.gia)}</p>
+                ${renderQrVe(ve)}
+            </div>
+        `).join("");
+    }
+
+    function renderQrVe(ve) {
+        if (!ve.maQR) {
+            return `<p><b>Mã QR:</b> Chưa có thông tin</p>`;
+        }
+
+        if (ve.maQR.startsWith("data:image")) {
+            return `
+                <div class="ticket-qr">
+                    <img src="${ve.maQR}" alt="QR vé ${ve.maVe}">
+                </div>
+            `;
+        }
+
+        return `<p><b>Mã QR:</b> ${ve.maQR}</p>`;
+    }
+
+    function layVeCuaToi() {
+        if (!user?.maNguoiDung) {
+            return [];
+        }
+
+        try {
+            return JSON.parse(localStorage.getItem(`tickets:${user.maNguoiDung}`)) || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function dangXuat() {
+        localStorage.removeItem("user");
+
+        fetch("/nguoidung/logout", {
+            method: "POST",
+            credentials: "include"
+        }).finally(() => {
+            window.location.href = "index.html";
+        });
+    }
+
+    function formatNgayGio(value) {
+        if (!value) {
+            return "Chưa có thông tin";
+        }
+
+        return new Date(value).toLocaleString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        });
+    }
+
+    function formatTien(value) {
+        return new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND"
+        }).format(value || 0);
+    }
+</script>
+
+</body>
+
+</html>

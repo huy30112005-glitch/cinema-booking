@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thanh toán</title>
+    <link rel="stylesheet" href="css/style.css?v=payment-center-1">
+</head>
+
+<body class="payment-page">
+
+<div class="topbar">
+    <div>
+        <h1>Thanh toán giả lập</h1>
+        <p class="muted">Xác nhận thanh toán để hệ thống phát hành vé</p>
+    </div>
+
+    <button class="btn-xoa" onclick="window.location.href='index.html'">
+        Quay lại
+    </button>
+</div>
+
+<div class="booking-panel payment-panel">
+    <h2>Thông tin đơn hàng</h2>
+
+    <p>
+        <b>Mã thanh toán:</b>
+        <span id="maThanhToan">Đang tải...</span>
+    </p>
+
+    <p>
+        <b>Mã đơn hàng:</b>
+        <span id="maDonHang">Đang tải...</span>
+    </p>
+
+    <p>
+        <b>Tổng tiền:</b>
+        <span id="tongTien">Đang tải...</span>
+    </p>
+
+    <p>
+        <b>Trạng thái:</b>
+        <span id="trangThai">Đang tải...</span>
+    </p>
+
+    <p>
+        <b>Thời gian còn lại:</b>
+        <span id="demNguocThanhToan">Đang tải...</span>
+    </p>
+
+    <div class="bank-transfer-box">
+        <h3>Thông tin chuyển khoản</h3>
+
+        <div id="qrThanhToanBox" class="payment-qr-box hidden">
+            <img id="qrThanhToan" alt="QR chuyển khoản">
+        </div>
+
+        <p>
+            <b>Ngân hàng:</b>
+            <span id="nganHang">Đang tải...</span>
+        </p>
+
+        <p>
+            <b>Tên tài khoản:</b>
+            <span id="tenTaiKhoan">Đang tải...</span>
+        </p>
+
+        <p>
+            <b>Số tài khoản:</b>
+            <span id="soTaiKhoan">Đang tải...</span>
+        </p>
+
+        <p>
+            <b>Nội dung:</b>
+            <span id="noiDungChuyenKhoan">Đang tải...</span>
+        </p>
+
+        <p id="bankInfoNote" class="muted"></p>
+    </div>
+
+    <div class="payment-actions">
+        <button id="btnXacNhanThanhToan" class="btn-them" onclick="xacNhanThanhToan()">
+            Thanh toán thành công
+        </button>
+
+        <button class="btn-xoa" onclick="window.location.href='index.html'">
+            Hủy
+        </button>
+    </div>
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const maThanhToan = params.get("maThanhToan");
+    let thongTinThanhToan = null;
+    let thongTinChuyenKhoan = null;
+    let demNguocTimer = null;
+
+    if (!maThanhToan) {
+        alert("Thiếu mã thanh toán");
+        window.location.href = "index.html";
+    }
+
+    taiThongTinThanhToan();
+    taiThongTinChuyenKhoan();
+
+    function taiThongTinThanhToan() {
+        fetch(`/payment/${maThanhToan}`, {
+            credentials: "include"
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    const message = await layThongBaoLoi(res);
+                    throw new Error(message || "Không tải được thanh toán");
+                }
+
+                return res.json();
+            })
+            .then(data => {
+                thongTinThanhToan = data;
+                document.getElementById("maThanhToan").innerText = data.maThanhToan;
+                document.getElementById("maDonHang").innerText = data.maDonHang;
+                document.getElementById("tongTien").innerText = formatTien(data.tongTien);
+                document.getElementById("trangThai").innerText = data.trangThai;
+                document.getElementById("noiDungChuyenKhoan").innerText =
+                    taoNoiDungChuyenKhoan(data);
+                batDauDemNguoc(data.giuDen);
+                capNhatQrChuyenKhoan();
+            })
+            .catch(err => {
+                alert(err.message || "Không tải được thanh toán");
+                window.location.href = "index.html";
+            });
+    }
+
+    function taiThongTinChuyenKhoan() {
+        fetch("/payment/bank-info", {
+            credentials: "include"
+        })
+            .then(res => res.json())
+            .then(data => {
+                thongTinChuyenKhoan = data;
+                const note = document.getElementById("bankInfoNote");
+
+                if (!data.configured) {
+                    document.getElementById("nganHang").innerText = "Chưa cấu hình";
+                    document.getElementById("tenTaiKhoan").innerText = "Chưa cấu hình";
+                    document.getElementById("soTaiKhoan").innerText = "Chưa cấu hình";
+                    document.getElementById("qrThanhToanBox").classList.add("hidden");
+                    note.innerText = "Admin chưa nhập thông tin chuyển khoản.";
+                    return;
+                }
+
+                document.getElementById("nganHang").innerText = data.bankName || data.bankCode;
+                document.getElementById("tenTaiKhoan").innerText = data.accountName;
+                document.getElementById("soTaiKhoan").innerText = data.accountNumber;
+                note.innerText = "Vui lòng chuyển khoản đúng số tiền và nội dung ở trên.";
+                capNhatQrChuyenKhoan();
+            })
+            .catch(() => {
+                document.getElementById("nganHang").innerText = "Không tải được";
+                document.getElementById("tenTaiKhoan").innerText = "Không tải được";
+                document.getElementById("soTaiKhoan").innerText = "Không tải được";
+                document.getElementById("qrThanhToanBox").classList.add("hidden");
+                document.getElementById("bankInfoNote").innerText =
+                    "Không tải được thông tin chuyển khoản.";
+            });
+    }
+
+    function capNhatQrChuyenKhoan() {
+        if (!thongTinThanhToan || !thongTinChuyenKhoan?.configured) {
+            return;
+        }
+
+        const amount = Math.round(thongTinThanhToan.tongTien || 0);
+        const addInfo = taoNoiDungChuyenKhoan(thongTinThanhToan);
+        const qrUrl = `https://img.vietqr.io/image/${encodeURIComponent(thongTinChuyenKhoan.bankCode)}-${encodeURIComponent(thongTinChuyenKhoan.accountNumber)}-compact2.png`
+            + `?amount=${encodeURIComponent(amount)}`
+            + `&addInfo=${encodeURIComponent(addInfo)}`
+            + `&accountName=${encodeURIComponent(thongTinChuyenKhoan.accountName)}`;
+
+        document.getElementById("qrThanhToan").src = qrUrl;
+        document.getElementById("qrThanhToanBox").classList.remove("hidden");
+    }
+
+    function taoNoiDungChuyenKhoan(data) {
+        return `TT${data.maThanhToan} DH${data.maDonHang}`;
+    }
+
+    function xacNhanThanhToan() {
+        if (thongTinThanhToan?.giuDen && Date.now() >= thongTinThanhToan.giuDen) {
+            alert("Thời gian thanh toán đã hết. Vui lòng chọn lại ghế");
+            window.location.href = "index.html";
+            return;
+        }
+
+        fetch("/payment/success", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                maThanhToan: parseInt(maThanhToan)
+            })
+        })
+            .then(async res => {
+                if (!res.ok) {
+                    const message = await layThongBaoLoi(res);
+                    throw new Error(message || "Thanh toán thất bại");
+                }
+
+                return res.json();
+            })
+            .then(ve => {
+                luuVeCuaToi(ve);
+                const dsVe = Array.isArray(ve) ? ve : [ve];
+                const maVe = dsVe.map(item => item.maVe).filter(Boolean).join(", ");
+                alert(`Thanh toán thành công. Mã vé: ${maVe}`);
+                window.location.href = "index.html";
+            })
+            .catch(err => {
+                alert(err.message || "Thanh toán thất bại");
+            });
+    }
+
+    function batDauDemNguoc(giuDen) {
+        if (demNguocTimer) {
+            clearInterval(demNguocTimer);
+        }
+
+        if (!giuDen) {
+            document.getElementById("demNguocThanhToan").innerText = "00:00";
+            document.getElementById("btnXacNhanThanhToan").disabled = true;
+            document.getElementById("btnXacNhanThanhToan").innerText = "Hết thời gian";
+            document.getElementById("bankInfoNote").innerText =
+                "Phiên giữ ghế đã hết hạn. Vui lòng chọn lại ghế.";
+            return;
+        }
+
+        const countdownEl = document.getElementById("demNguocThanhToan");
+        const button = document.getElementById("btnXacNhanThanhToan");
+
+        function capNhat() {
+            const remaining = Math.max(0, giuDen - Date.now());
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+
+            countdownEl.innerText =
+                `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+
+            if (remaining <= 0) {
+                clearInterval(demNguocTimer);
+                button.disabled = true;
+                button.innerText = "Hết thời gian";
+                countdownEl.innerText = "00:00";
+                document.getElementById("bankInfoNote").innerText =
+                    "Phiên giữ ghế đã hết hạn. Vui lòng chọn lại ghế.";
+            }
+        }
+
+        capNhat();
+        demNguocTimer = setInterval(capNhat, 1000);
+    }
+
+    async function layThongBaoLoi(res) {
+        const contentType = res.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+            const data = await res.json();
+            return data.message;
+        }
+
+        return res.text();
+    }
+
+    function formatTien(value) {
+        return new Intl.NumberFormat("vi-VN", {
+            style: "currency",
+            currency: "VND"
+        }).format(value || 0);
+    }
+
+    function luuVeCuaToi(ve) {
+        const dsVe = Array.isArray(ve) ? ve : [ve];
+        let user = null;
+
+        try {
+            user = JSON.parse(localStorage.getItem("user"));
+        } catch (e) {
+            user = null;
+        }
+
+        if (!user?.maNguoiDung || dsVe.length === 0) {
+            return;
+        }
+
+        const storageKey = `tickets:${user.maNguoiDung}`;
+        let tickets = [];
+
+        try {
+            tickets = JSON.parse(localStorage.getItem(storageKey)) || [];
+        } catch (e) {
+            tickets = [];
+        }
+
+        const maVeMoi = new Set(dsVe.map(item => item?.maVe).filter(Boolean));
+        tickets = tickets.filter(item => !maVeMoi.has(item.maVe));
+
+        dsVe
+            .filter(item => item?.maVe)
+            .reverse()
+            .forEach(item => {
+                tickets.unshift({
+                    ...item,
+                    luuLuc: new Date().toISOString()
+                });
+            });
+
+        localStorage.setItem(storageKey, JSON.stringify(tickets));
+    }
+</script>
+
+</body>
+
+</html>
