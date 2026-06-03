@@ -954,14 +954,12 @@ public class PaymentService {
                 jdbcTemplate.update("""
                         INSERT INTO thanh_toan_cho_duyet_ghe_chi_tiet (ma_thanh_toan, ma_suat_chieu, ma_ghe)
                         VALUES (?, ?, ?)
-                        ON CONFLICT (ma_thanh_toan, ma_suat_chieu, ma_ghe) DO NOTHING
                         """, maThanhToan, group.maSuatChieu(), maGhe);
 
                 if (group.maSuatChieu().equals(firstMaSuatChieu)) {
                     jdbcTemplate.update("""
                             INSERT INTO thanh_toan_cho_duyet_ghe (ma_thanh_toan, ma_ghe)
                             VALUES (?, ?)
-                            ON CONFLICT (ma_thanh_toan, ma_ghe) DO NOTHING
                             """, maThanhToan, maGhe);
                 }
             }
