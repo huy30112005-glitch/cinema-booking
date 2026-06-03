@@ -3,10 +3,13 @@ let user = layUserDaLuu();
 let gheDangChon = [];
 let gheRefreshTimer = null;
 let danhSachSuatChieuChiTiet = [];
+let gheCanChonSauTai = [];
+let dangSuaGioHangKey = null;
 
 capNhatTrangThaiDangNhap();
 kiemTraDangNhap();
 loadChiTietPhim();
+capNhatGioHangBadge();
 
 function layUserDaLuu() {
 
@@ -51,6 +54,7 @@ function kiemTraDangNhap() {
             user = await res.json();
             localStorage.setItem("user", JSON.stringify(user));
             capNhatTrangThaiDangNhap();
+            capNhatGioHangBadge();
 
         })
         .catch(() => {
@@ -470,6 +474,11 @@ function loadGheTheoSuatChieu(silent = false) {
         .then(data => {
             document.getElementById("dsGhe").innerHTML = renderSoDoGhe(data);
 
+            if (gheCanChonSauTai.length > 0) {
+                gheDangChon = [...gheCanChonSauTai];
+                gheCanChonSauTai = [];
+            }
+
             gheDangChon = gheDangChon.filter(maGhe => {
                 const gheButton = document.querySelector(`[data-ma-ghe="${maGhe}"]`);
 
@@ -705,6 +714,10 @@ function capNhatTamTinhGhe() {
 
 function layGiaGhe(ghe) {
 
+    if (!ghe) {
+        return 0;
+    }
+
     if (ghe.classList.contains("couple")) {
         return 160000;
     }
@@ -737,6 +750,12 @@ function xacNhanDatVe() {
         return;
     }
 
+    taoThanhToan(parseInt(maSuatChieu), gheDangChon);
+
+}
+
+function taoThanhToan(maSuatChieu, maGheList, gioHangKey = null) {
+
     fetch("/payment/create", {
         method:"POST",
         credentials:"include",
@@ -744,9 +763,9 @@ function xacNhanDatVe() {
             "Content-Type":"application/json"
         },
         body:JSON.stringify({
-            maSuatChieu:parseInt(maSuatChieu),
-            maGhe:gheDangChon[0],
-            maGheList:gheDangChon
+            maSuatChieu:maSuatChieu,
+            maGhe:maGheList[0],
+            maGheList:maGheList
         })
     })
         .then(async res => {
@@ -773,6 +792,9 @@ function xacNhanDatVe() {
 
         })
         .then(data => {
+            if (gioHangKey) {
+                luuGioHang(layGioHang().filter(item => item.key !== gioHangKey));
+            }
             window.location.href = data.paymentUrl;
         })
         .catch(err => {
@@ -785,6 +807,194 @@ function xacNhanDatVe() {
             alert(err.message || "Không tạo được thanh toán");
 
         });
+
+}
+
+function themGheVaoGioHang() {
+
+    if (!user) {
+        alert("Vui lòng đăng nhập để thêm vé vào giỏ hàng");
+        window.location.href = "login.html";
+        return;
+    }
+
+    const maSuatChieu = Number(document.getElementById("maSuatChieu").value);
+
+    if (!maSuatChieu || gheDangChon.length === 0) {
+        alert("Vui lòng chọn suất chiếu và ghế");
+        return;
+    }
+
+    const suatChieu = danhSachSuatChieuChiTiet.find(item =>
+        Number(item.maSuatChieu) === maSuatChieu
+    );
+
+    const gheList = gheDangChon.map(maGhe => {
+        const gheButton = document.querySelector(`[data-ma-ghe="${maGhe}"]`);
+        return {
+            maGhe,
+            soGhe:gheButton?.getAttribute("title")?.split(" - ")[0] || String(maGhe),
+            gia:layGiaGhe(gheButton)
+        };
+    });
+
+    const gioHang = layGioHang();
+    const key = taoGioHangItemKey(maSuatChieu);
+    const itemDangSua = gioHang.find(cartItem => cartItem.key === key);
+    const item = {
+        key,
+        maPhim:itemDangSua?.maPhim || phimDangXem?.maPhim || null,
+        tenPhim:itemDangSua?.tenPhim || phimDangXem?.tenPhim || "Phim",
+        maSuatChieu,
+        thoiGianBatDau:suatChieu?.thoiGianBatDau || itemDangSua?.thoiGianBatDau || null,
+        thoiGianKetThuc:suatChieu?.thoiGianKetThuc || itemDangSua?.thoiGianKetThuc || null,
+        tenPhong:suatChieu?.tenPhong || itemDangSua?.tenPhong || "",
+        gheList,
+        maGheList:gheList.map(ghe => ghe.maGhe),
+        tongTien:gheList.reduce((tong, ghe) => tong + ghe.gia, 0)
+    };
+
+    const viTriCu = gioHang.findIndex(cartItem => cartItem.key === key);
+
+    if (viTriCu >= 0) {
+        gioHang[viTriCu] = item;
+    } else {
+        gioHang.push(item);
+    }
+
+    luuGioHang(gioHang);
+    dangSuaGioHangKey = null;
+    dongSeatModal();
+    renderGioHang();
+    moGioHang();
+
+}
+
+function moGioHang() {
+
+    renderGioHang();
+    document.getElementById("gioHangPanel")?.classList.remove("hidden");
+
+}
+
+function dongGioHang() {
+
+    document.getElementById("gioHangPanel")?.classList.add("hidden");
+
+}
+
+function renderGioHang() {
+
+    const container = document.getElementById("gioHangList");
+
+    if (!container) {
+        return;
+    }
+
+    const gioHang = layGioHang();
+    capNhatGioHangBadge();
+
+    if (gioHang.length === 0) {
+        container.innerHTML = `<p class="muted">Giỏ hàng chưa có vé.</p>`;
+        return;
+    }
+
+    container.innerHTML = gioHang.map(item => `
+        <article class="cart-item">
+            <div>
+                <h3>${item.tenPhim}</h3>
+                <p>${formatNgayGio(item.thoiGianBatDau)}${item.tenPhong ? ` - ${item.tenPhong}` : ""}</p>
+                <p>Ghế: <strong>${(item.gheList || []).map(ghe => ghe.soGhe).join(", ")}</strong></p>
+                <p class="cart-price">${Number(item.tongTien || 0).toLocaleString("vi-VN")} đ</p>
+            </div>
+            <div class="cart-actions">
+                <button class="btn-sua" onclick="doiGheTrongGioHang('${item.key}')">Đổi ghế</button>
+                <button class="btn-them" onclick="thanhToanGioHang('${item.key}')">Thanh toán</button>
+                <button class="btn-xoa" onclick="xoaKhoiGioHang('${item.key}')">Xóa</button>
+            </div>
+        </article>
+    `).join("");
+
+}
+
+function doiGheTrongGioHang(key) {
+
+    const item = layGioHang().find(cartItem => cartItem.key === key);
+
+    if (!item) {
+        return;
+    }
+
+    dangSuaGioHangKey = key;
+    gheCanChonSauTai = item.maGheList || [];
+    document.getElementById("maSuatChieu").value = item.maSuatChieu;
+    chonSuatChieu(item.maSuatChieu);
+
+}
+
+function thanhToanGioHang(key) {
+
+    const item = layGioHang().find(cartItem => cartItem.key === key);
+
+    if (!item) {
+        return;
+    }
+
+    taoThanhToan(item.maSuatChieu, item.maGheList, key);
+
+}
+
+function xoaKhoiGioHang(key) {
+
+    luuGioHang(layGioHang().filter(item => item.key !== key));
+    renderGioHang();
+
+}
+
+function layGioHang() {
+
+    try {
+        return JSON.parse(localStorage.getItem(layGioHangKey())) || [];
+    } catch (e) {
+        localStorage.removeItem(layGioHangKey());
+        return [];
+    }
+
+}
+
+function luuGioHang(gioHang) {
+
+    localStorage.setItem(layGioHangKey(), JSON.stringify(gioHang));
+    capNhatGioHangBadge();
+
+}
+
+function layGioHangKey() {
+
+    const userKey = user?.maNguoiDung || user?.email || "guest";
+    return `gioHang:${userKey}`;
+
+}
+
+function taoGioHangItemKey(maSuatChieu) {
+
+    return `suat-${maSuatChieu}`;
+
+}
+
+function capNhatGioHangBadge() {
+
+    const badge = document.getElementById("cartBadge");
+
+    if (!badge) {
+        return;
+    }
+
+    const soLuongVe = layGioHang()
+        .reduce((tong, item) => tong + (item.maGheList?.length || 0), 0);
+
+    badge.innerText = soLuongVe;
+    badge.classList.toggle("hidden", soLuongVe === 0);
 
 }
 
