@@ -8,6 +8,7 @@ let bannerIndex = 0;
 let bannerTimer = null;
 let dangKiemTraDangNhap = true;
 let dangHienTatCaPhim = false;
+let danhSachSuatChieuDatVe = [];
 let maPhimDangChoDat = layMaPhimCanDatTuUrl()
     || Number(sessionStorage.getItem("pendingBookingMovieId"));
 
@@ -578,6 +579,7 @@ function loadSuatChieu(maPhim) {
         .then(res => res.json())
         .then(data => {
 
+            danhSachSuatChieuDatVe = data;
             document.getElementById("lichChieuDatVe").innerHTML =
                 renderLichChieu(data, "booking");
 
@@ -1033,6 +1035,10 @@ function capNhatTamTinhGhe() {
 
 function layGiaGhe(ghe) {
 
+    if (!ghe) {
+        return 0;
+    }
+
     if (ghe.classList.contains("couple")) {
         return 160000;
     }
@@ -1042,6 +1048,84 @@ function layGiaGhe(ghe) {
     }
 
     return 60000;
+
+}
+
+function themGheVaoGioHang() {
+
+    if (!user) {
+        alert("Vui lòng đăng nhập để thêm vé vào giỏ hàng");
+        window.location.href = "login.html";
+        return;
+    }
+
+    const maSuatChieu = Number(document.getElementById("maSuatChieu").value);
+
+    if (!maSuatChieu || gheDangChon.length === 0) {
+        alert("Vui lòng chọn suất chiếu và ghế");
+        return;
+    }
+
+    const suatChieu = danhSachSuatChieuDatVe.find(item =>
+        Number(item.maSuatChieu) === maSuatChieu
+    );
+    const gheList = gheDangChon.map(maGhe => {
+        const gheButton = document.querySelector(`[data-ma-ghe="${maGhe}"]`);
+        return {
+            maGhe,
+            soGhe:gheButton?.getAttribute("title")?.split(" - ")[0] || String(maGhe),
+            gia:layGiaGhe(gheButton)
+        };
+    });
+    const gioHang = layGioHang();
+    const key = `suat-${maSuatChieu}`;
+    const item = {
+        key,
+        maPhim:phimDangChon?.maPhim || null,
+        tenPhim:phimDangChon?.tenPhim || "Phim",
+        maSuatChieu,
+        thoiGianBatDau:suatChieu?.thoiGianBatDau || null,
+        thoiGianKetThuc:suatChieu?.thoiGianKetThuc || null,
+        tenPhong:suatChieu?.tenPhong || "",
+        gheList,
+        maGheList:gheList.map(ghe => ghe.maGhe),
+        tongTien:gheList.reduce((tong, ghe) => tong + ghe.gia, 0)
+    };
+    const viTriCu = gioHang.findIndex(cartItem => cartItem.key === key);
+
+    if (viTriCu >= 0) {
+        gioHang[viTriCu] = item;
+    } else {
+        gioHang.push(item);
+    }
+
+    luuGioHang(gioHang);
+    dongSeatModal();
+    window.location.href = "/cart.html";
+
+}
+
+function layGioHang() {
+
+    try {
+        return JSON.parse(localStorage.getItem(layGioHangKey())) || [];
+    } catch (e) {
+        localStorage.removeItem(layGioHangKey());
+        return [];
+    }
+
+}
+
+function luuGioHang(gioHang) {
+
+    localStorage.setItem(layGioHangKey(), JSON.stringify(gioHang));
+
+}
+
+function layGioHangKey() {
+
+    const userKey = user?.maNguoiDung || user?.email || "guest";
+    return `gioHang:${userKey}`;
 
 }
 

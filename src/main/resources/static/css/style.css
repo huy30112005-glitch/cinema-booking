@@ -1151,6 +1151,92 @@
             margin:0;
         }
 
+        .cart-page-heading{
+            display:flex;
+            align-items:flex-end;
+            justify-content:space-between;
+            gap:20px;
+            margin:8px 0 22px;
+        }
+
+        .cart-page-heading h1{
+            color:white;
+            font-size:34px;
+            margin:0 0 8px;
+        }
+
+        .cart-page-heading p{
+            color:#bbb;
+            margin:0;
+        }
+
+        .cart-page-heading button{
+            margin:0;
+        }
+
+        .cart-page-layout{
+            display:grid;
+            grid-template-columns:minmax(0, 1fr) 320px;
+            gap:20px;
+            align-items:start;
+        }
+
+        .cart-item-large{
+            min-height:138px;
+        }
+
+        .cart-summary{
+            position:sticky;
+            top:110px;
+            background:#181818;
+            border:1px solid #343434;
+            border-radius:8px;
+            padding:20px;
+        }
+
+        .cart-summary h2{
+            margin:0 0 16px;
+        }
+
+        .cart-summary p{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            color:#ddd;
+            margin-bottom:12px;
+        }
+
+        .cart-summary strong{
+            color:#fff200;
+        }
+
+        .cart-summary button{
+            width:100%;
+            margin:8px 0 0;
+        }
+
+        .cart-empty{
+            background:#181818;
+            border:1px solid #343434;
+            border-radius:8px;
+            padding:28px;
+            text-align:center;
+        }
+
+        .cart-empty h2{
+            margin:0 0 10px;
+        }
+
+        .cart-empty p{
+            color:#bbb;
+            margin-bottom:18px;
+        }
+
+        .cart-empty button{
+            margin:0;
+        }
+
         .seat-map{
             position:relative;
             --seat-width:42px;
@@ -1856,5 +1942,16 @@
             .cart-actions{
                 justify-content:flex-start;
                 min-width:0;
+            }
+
+            .cart-page-heading,
+            .cart-page-layout{
+                grid-template-columns:1fr;
+                align-items:stretch;
+                flex-direction:column;
+            }
+
+            .cart-summary{
+                position:static;
             }
         }

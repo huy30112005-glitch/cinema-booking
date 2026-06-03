@@ -25,7 +25,7 @@
         <a href="#datVePanel">Lịch chiếu</a>
         <a href="#bannerPhim">Rạp</a>
         <a href="#dsPhim">Ưu đãi</a>
-        <a href="#datVePanel">Giỏ hàng</a>
+        <a href="/cart.html">Giỏ hàng</a>
     </nav>
 
     <div class="topbar-actions">
@@ -83,9 +83,14 @@
 
             <div class="seat-modal-footer">
                 <h3>Tạm tính: <span id="tamTinhGhe">0 đ</span></h3>
-                <button class="btn-them" onclick="xacNhanDatVe()">
-                    Xác nhận
-                </button>
+                <div class="seat-modal-actions">
+                    <button class="btn-sua" onclick="themGheVaoGioHang()">
+                        Thêm vào giỏ
+                    </button>
+                    <button class="btn-them" onclick="xacNhanDatVe()">
+                        Thanh toán ngay
+                    </button>
+                </div>
             </div>
         </div>
     </div>

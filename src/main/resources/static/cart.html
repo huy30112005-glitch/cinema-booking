@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chi tiết phim</title>
-    <link rel="stylesheet" href="css/style.css?v=admin-tabs-1">
+    <title>Giỏ hàng</title>
+    <link rel="stylesheet" href="css/style.css?v=cart-page-1">
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -25,7 +25,7 @@
         <a href="/index.html#datVePanel">Lịch chiếu</a>
         <a href="/index.html#bannerPhim">Rạp</a>
         <a href="/index.html#dsPhim">Ưu đãi</a>
-        <a href="/cart.html">Giỏ hàng <span id="cartBadge" class="cart-badge hidden">0</span></a>
+        <a class="active" href="/cart.html">Giỏ hàng <span id="cartBadge" class="cart-badge hidden">0</span></a>
     </nav>
 
     <div class="topbar-actions">
@@ -40,29 +40,30 @@
 </header>
 
 <main class="page-content">
-    <div class="detail-breadcrumb">
-        <a href="/index.html">Trang chủ</a>
-        <span>/</span>
-        <a href="/index.html#dsPhim">Phim</a>
-        <span>/</span>
-        <strong id="breadcrumbTitle">Chi tiết phim</strong>
-    </div>
-
-    <section id="movieDetail" class="movie-detail-panel">
-        <p class="muted">Đang tải chi tiết phim...</p>
+    <section class="cart-page-heading">
+        <div>
+            <h1>Giỏ hàng</h1>
+            <p>Thanh toán nhiều vé từ nhiều phim trong cùng một đơn.</p>
+        </div>
+        <button class="btn-sua" onclick="window.location.href='/index.html#dsPhim'">
+            Chọn thêm phim
+        </button>
     </section>
 
-    <input type="hidden" id="maSuatChieu">
-
-    <section id="gioHangPanel" class="cart-panel hidden">
-        <div class="cart-header">
-            <div>
-                <h2>Giỏ hàng</h2>
-                <p>Kiểm tra vé đã chọn trước khi thanh toán.</p>
-            </div>
-            <button class="btn-xoa" onclick="dongGioHang()">Đóng</button>
-        </div>
+    <section class="cart-page-layout">
         <div id="gioHangList" class="cart-list"></div>
+
+        <aside class="cart-summary">
+            <h2>Tổng đơn</h2>
+            <p>Số vé: <strong id="tongSoVe">0</strong></p>
+            <p>Tổng tiền: <strong id="tongTienGioHang">0 đ</strong></p>
+            <button id="btnThanhToanTatCa" class="btn-them" onclick="thanhToanTatCa()">
+                Thanh toán tất cả
+            </button>
+            <button class="btn-xoa" onclick="xoaToanBoGioHang()">
+                Xóa giỏ hàng
+            </button>
+        </aside>
     </section>
 
     <div id="seatModal" class="seat-modal hidden">
@@ -76,11 +77,11 @@
             <div class="seat-modal-footer">
                 <h3>Tạm tính: <span id="tamTinhGhe">0 đ</span></h3>
                 <div class="seat-modal-actions">
-                    <button class="btn-sua" onclick="themGheVaoGioHang()">
-                        Thêm vào giỏ
+                    <button class="btn-sua" onclick="luuDoiGhe()">
+                        Lưu ghế
                     </button>
-                    <button class="btn-them" onclick="xacNhanDatVe()">
-                        Thanh toán ngay
+                    <button class="btn-xoa" onclick="dongSeatModal()">
+                        Hủy
                     </button>
                 </div>
             </div>
@@ -101,9 +102,9 @@
 
     <div>
         <h3>Khám phá</h3>
-        <p><a href="#">Về chúng tôi</a></p>
-        <p><a href="#">Hệ thống rạp</a></p>
-        <p><a href="#">Tuyển dụng</a></p>
+        <p><a href="/index.html#dsPhim">Phim</a></p>
+        <p><a href="/index.html#bannerPhim">Hệ thống rạp</a></p>
+        <p><a href="/index.html#dsPhim">Ưu đãi</a></p>
     </div>
 
     <div>
@@ -132,7 +133,7 @@
     </div>
 </footer>
 
-<script src="js/movie-detail.js?v=admin-tabs-1"></script>
+<script src="js/cart.js?v=cart-page-1"></script>
 
 </body>
 </html>

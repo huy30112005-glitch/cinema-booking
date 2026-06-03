@@ -865,8 +865,7 @@ function themGheVaoGioHang() {
     luuGioHang(gioHang);
     dangSuaGioHangKey = null;
     dongSeatModal();
-    renderGioHang();
-    moGioHang();
+    window.location.href = "/cart.html";
 
 }
 

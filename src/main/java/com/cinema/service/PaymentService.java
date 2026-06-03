@@ -110,6 +110,15 @@ public class PaymentService {
                 """);
 
         jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS thanh_toan_cho_duyet_ghe_chi_tiet (
+                    ma_thanh_toan INTEGER NOT NULL,
+                    ma_suat_chieu INTEGER NOT NULL,
+                    ma_ghe INTEGER NOT NULL,
+                    PRIMARY KEY (ma_thanh_toan, ma_suat_chieu, ma_ghe)
+                )
+                """);
+
+        jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS thanh_toan_ve (
                     ma_thanh_toan INTEGER NOT NULL,
                     ma_ve INTEGER NOT NULL,
@@ -130,57 +139,66 @@ public class PaymentService {
             return ResponseEntity.status(401).body(new ApiResponse(false, "Vui lòng đăng nhập để thanh toán"));
         }
 
-        List<Integer> maGheList;
+        PendingPayment pendingPayment;
 
         try {
-            maGheList = normalizeMaGheList(request);
+            pendingPayment = normalizePendingPayment(request);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
         }
-        SuatChieu suatChieu = suatChieuRepository.findById(request.getMaSuatChieu()).orElse(null);
-        List<Ghe> gheList = gheRepository.findAllById(maGheList);
 
-        if (suatChieu == null || gheList.size() != maGheList.size()) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Suất chiếu hoặc ghế không tồn tại"));
-        }
+        double tongTien = 0.0;
 
-        for (Ghe ghe : gheList) {
-            boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
-                    suatChieu.getMaSuatChieu(),
-                    ghe.getMaGhe()
-            );
+        for (PendingSeatGroup group : pendingPayment.groups()) {
+            SuatChieu suatChieu = suatChieuRepository.findById(group.maSuatChieu()).orElse(null);
+            List<Ghe> gheList = gheRepository.findAllById(group.maGheList());
 
-            if (daDat) {
-                return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
+            if (suatChieu == null || gheList.size() != group.maGheList().size()) {
+                return ResponseEntity.badRequest().body(new ApiResponse(false, "Suất chiếu hoặc ghế không tồn tại"));
             }
+
+            for (Ghe ghe : gheList) {
+                boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
+                        suatChieu.getMaSuatChieu(),
+                        ghe.getMaGhe()
+                );
+
+                if (daDat) {
+                    return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
+                }
+            }
+
+            tongTien += gheList.stream().mapToDouble(this::tinhGiaVe).sum();
         }
 
         Instant earliestExpiresAt = null;
-        List<Integer> heldSeats = new ArrayList<>();
+        List<HeldSeat> heldSeats = new ArrayList<>();
 
         try {
-            for (Integer maGhe : maGheList) {
-                SeatHoldService.SeatHold seatHold = seatHoldService.hold(
-                        request.getMaSuatChieu(),
-                        maGhe,
-                        user
-                );
+            for (PendingSeatGroup group : pendingPayment.groups()) {
+                for (Integer maGhe : group.maGheList()) {
+                    SeatHoldService.SeatHold seatHold = seatHoldService.hold(
+                            group.maSuatChieu(),
+                            maGhe,
+                            user
+                    );
 
-                heldSeats.add(maGhe);
+                    heldSeats.add(new HeldSeat(group.maSuatChieu(), maGhe));
 
-                if (earliestExpiresAt == null || seatHold.expiresAt().isBefore(earliestExpiresAt)) {
-                    earliestExpiresAt = seatHold.expiresAt();
+                    if (earliestExpiresAt == null || seatHold.expiresAt().isBefore(earliestExpiresAt)) {
+                        earliestExpiresAt = seatHold.expiresAt();
+                    }
                 }
             }
         } catch (IllegalArgumentException e) {
-            heldSeats.forEach(maGhe -> seatHoldService.release(request.getMaSuatChieu(), maGhe));
+            releaseHeldSeats(heldSeats);
             return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
         }
 
         DonHang donHang = new DonHang();
         donHang.setNguoiDung(user);
         donHang.setThoiGianTao(LocalDateTime.now());
-        donHang.setTongTien(gheList.stream().mapToDouble(this::tinhGiaVe).sum());
+        donHang.setTongTien(tongTien);
         donHang.setTrangThai(false);
         donHang = donHangRepository.save(donHang);
 
@@ -195,9 +213,9 @@ public class PaymentService {
 
         session.setAttribute(
                 PAYMENT_SESSION_PREFIX + thanhToan.getMaThanhToan(),
-                new PendingPayment(request.getMaSuatChieu(), maGheList)
+                pendingPayment
         );
-        savePendingPayment(thanhToan.getMaThanhToan(), request.getMaSuatChieu(), user.getMaNguoiDung(), maGheList);
+        savePendingPayment(thanhToan.getMaThanhToan(), user.getMaNguoiDung(), pendingPayment);
 
         String paymentUrl;
 
@@ -205,12 +223,11 @@ public class PaymentService {
             try {
                 paymentUrl = createMomoPaymentUrl(
                         thanhToan,
-                        request.getMaSuatChieu(),
-                        maGheList,
+                        pendingPayment,
                         servletRequest
                 );
             } catch (IllegalStateException e) {
-                heldSeats.forEach(maGhe -> seatHoldService.release(request.getMaSuatChieu(), maGhe));
+                releaseHeldSeats(heldSeats);
                 return ResponseEntity.internalServerError()
                         .body(new ApiResponse(false, e.getMessage()));
             }
@@ -246,7 +263,7 @@ public class PaymentService {
                 thanhToan.getDonHang().getMaDonHang(),
                 thanhToan.getDonHang().getTongTien(),
                 hienThiTrangThaiThanhToan(thanhToan.getTrangThai()),
-                pendingPayment.maSuatChieu(),
+                pendingPayment.firstMaSuatChieu(),
                 pendingPayment.firstMaGhe(),
                 pendingPayment.maGheList(),
                 getHoldExpiresAtMillis(session, pendingPayment)
@@ -283,19 +300,21 @@ public class PaymentService {
         }
 
         try {
-            for (Integer maGhe : pendingPayment.maGheList()) {
-                seatHoldService.requireHeldByUser(
-                        pendingPayment.maSuatChieu(),
-                        maGhe,
-                        user
-                );
+            for (PendingSeatGroup group : pendingPayment.groups()) {
+                for (Integer maGhe : group.maGheList()) {
+                    seatHoldService.requireHeldByUser(
+                            group.maSuatChieu(),
+                            maGhe,
+                            user
+                    );
 
-                seatHoldService.extendHold(
-                        pendingPayment.maSuatChieu(),
-                        maGhe,
-                        user,
-                        ADMIN_REVIEW_HOLD_DURATION
-                );
+                    seatHoldService.extendHold(
+                            group.maSuatChieu(),
+                            maGhe,
+                            user,
+                            ADMIN_REVIEW_HOLD_DURATION
+                    );
+                }
             }
 
             thanhToan.setThoiGianThanhToan(LocalDateTime.now());
@@ -336,8 +355,13 @@ public class PaymentService {
 
             DonHang donHang = thanhToan.getDonHang();
             NguoiDung nguoiDung = donHang.getNguoiDung();
-            SuatChieu suatChieu = suatChieuRepository.findById(pendingPayment.maSuatChieu()).orElse(null);
-            List<Ghe> gheList = gheRepository.findAllById(pendingPayment.maGheList());
+            List<SuatChieu> suatChieuList = pendingPayment.groups().stream()
+                    .map(group -> suatChieuRepository.findById(group.maSuatChieu()).orElse(null))
+                    .filter(item -> item != null)
+                    .toList();
+            List<Ghe> gheList = pendingPayment.groups().stream()
+                    .flatMap(group -> gheRepository.findAllById(group.maGheList()).stream())
+                    .toList();
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("maThanhToan", thanhToan.getMaThanhToan());
@@ -346,8 +370,12 @@ public class PaymentService {
             item.put("thoiGianYeuCau", getPendingRequestedAt(paymentId));
             item.put("khachHang", nguoiDung != null ? nguoiDung.getTenNguoiDung() : "Khách hàng");
             item.put("email", nguoiDung != null ? nguoiDung.getEmail() : "");
-            item.put("phim", suatChieu != null && suatChieu.getPhim() != null ? suatChieu.getPhim().getTenPhim() : "");
-            item.put("suatChieu", suatChieu != null ? suatChieu.getThoiGianBatDau() : null);
+            item.put("phim", suatChieuList.stream()
+                    .map(sc -> sc.getPhim() != null ? sc.getPhim().getTenPhim() : "")
+                    .filter(tenPhim -> !tenPhim.isBlank())
+                    .distinct()
+                    .toList());
+            item.put("suatChieu", suatChieuList.isEmpty() ? null : suatChieuList.get(0).getThoiGianBatDau());
             item.put("ghe", gheList.stream().map(Ghe::getSoGhe).sorted().toList());
             result.add(item);
         }
@@ -373,28 +401,11 @@ public class PaymentService {
             return ResponseEntity.badRequest().body(new ApiResponse(false, "Thanh toán này đã hoàn tất"));
         }
 
-        SuatChieu suatChieu = suatChieuRepository.findById(pendingPayment.maSuatChieu()).orElse(null);
-        List<Ghe> gheList = gheRepository.findAllById(pendingPayment.maGheList());
-
-        if (suatChieu == null || gheList.size() != pendingPayment.maGheList().size()) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Suất chiếu hoặc ghế không tồn tại"));
-        }
-
-        for (Ghe ghe : gheList) {
-            boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
-                    suatChieu.getMaSuatChieu(),
-                    ghe.getMaGhe()
-            );
-
-            if (daDat) {
-                return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
-            }
-        }
-
-        List<VeDTO> veList = new ArrayList<>();
-
-        for (Ghe ghe : gheList) {
-            veList.add(veService.emitTicket(suatChieu, ghe));
+        List<VeDTO> veList;
+        try {
+            veList = emitTickets(pendingPayment);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponse(false, e.getMessage()));
         }
         savePaymentTickets(maThanhToan, veList);
 
@@ -407,8 +418,7 @@ public class PaymentService {
         thanhToanRepository.save(thanhToan);
 
         markPendingPaymentProcessed(maThanhToan, TRANG_THAI_DA_DUYET);
-        pendingPayment.maGheList().forEach(maGhe ->
-                seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
+        releasePendingPaymentSeats(pendingPayment);
 
         return ResponseEntity.ok(veList);
     }
@@ -422,8 +432,7 @@ public class PaymentService {
         }
 
         markPendingPaymentProcessed(maThanhToan, TRANG_THAI_TU_CHOI);
-        pendingPayment.maGheList().forEach(maGhe ->
-                seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
+        releasePendingPaymentSeats(pendingPayment);
 
         return ResponseEntity.ok(new ApiResponse(true, "Đã từ chối thanh toán và nhả ghế"));
     }
@@ -550,30 +559,8 @@ public class PaymentService {
             return ResponseEntity.badRequest().body(new ApiResponse(false, "Thanh toán này đã hoàn tất"));
         }
 
-        SuatChieu suatChieu = suatChieuRepository.findById(pendingPayment.maSuatChieu()).orElse(null);
-        List<Ghe> gheList = gheRepository.findAllById(pendingPayment.maGheList());
-
-        if (suatChieu == null || gheList.size() != pendingPayment.maGheList().size()) {
-            return ResponseEntity.badRequest().body(new ApiResponse(false, "Suất chiếu hoặc ghế không tồn tại"));
-        }
-
         try {
-            for (Ghe ghe : gheList) {
-                boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
-                        suatChieu.getMaSuatChieu(),
-                        ghe.getMaGhe()
-                );
-
-                if (daDat) {
-                    return ResponseEntity.badRequest().body(new ApiResponse(false, "Ghế " + ghe.getSoGhe() + " đã được đặt"));
-                }
-            }
-
-            List<VeDTO> veList = new ArrayList<>();
-
-            for (Ghe ghe : gheList) {
-                veList.add(veService.emitTicket(suatChieu, ghe));
-            }
+            List<VeDTO> veList = emitTickets(pendingPayment);
             savePaymentTickets(maThanhToan, veList);
 
             DonHang donHang = thanhToan.getDonHang();
@@ -583,8 +570,7 @@ public class PaymentService {
             thanhToan.setTrangThai(true);
             thanhToan.setThoiGianThanhToan(LocalDateTime.now());
             thanhToanRepository.save(thanhToan);
-            pendingPayment.maGheList().forEach(maGhe ->
-                    seatHoldService.release(pendingPayment.maSuatChieu(), maGhe));
+            releasePendingPaymentSeats(pendingPayment);
 
             return ResponseEntity.ok(veList);
         } catch (IllegalArgumentException e) {
@@ -603,8 +589,7 @@ public class PaymentService {
 
     private String createMomoPaymentUrl(
             ThanhToan thanhToan,
-            Integer maSuatChieu,
-            List<Integer> maGheList,
+            PendingPayment pendingPayment,
             HttpServletRequest request) {
 
         validateMomoConfig();
@@ -623,8 +608,7 @@ public class PaymentService {
         );
         String extraData = encodePendingPayment(
                 thanhToan.getMaThanhToan(),
-                maSuatChieu,
-                maGheList
+                pendingPayment
         );
         String requestType = momoProperties.getRequestType();
 
@@ -705,11 +689,17 @@ public class PaymentService {
         return signature.equalsIgnoreCase(hmacSha256(rawSignature, momoProperties.getSecretKey()));
     }
 
-    private String encodePendingPayment(Integer maThanhToan, Integer maSuatChieu, List<Integer> maGheList) {
+    private String encodePendingPayment(Integer maThanhToan, PendingPayment pendingPayment) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("maThanhToan", maThanhToan);
-        data.put("maSuatChieu", maSuatChieu);
-        data.put("maGheList", maGheList);
+        data.put("items", pendingPayment.groups().stream()
+                .map(group -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("maSuatChieu", group.maSuatChieu());
+                    item.put("maGheList", group.maGheList());
+                    return item;
+                })
+                .toList());
 
         try {
             return Base64.getEncoder().encodeToString(
@@ -728,6 +718,12 @@ public class PaymentService {
         try {
             String json = new String(Base64.getDecoder().decode(extraData), StandardCharsets.UTF_8);
             Map<?, ?> data = objectMapper.readValue(json, Map.class);
+            PendingPayment pendingPayment = pendingPaymentFromRawItems(data.get("items"));
+
+            if (pendingPayment != null) {
+                return pendingPayment;
+            }
+
             Integer maSuatChieu = asInteger(data.get("maSuatChieu"));
             List<Integer> maGheList = asIntegerList(data.get("maGheList"));
 
@@ -743,7 +739,7 @@ public class PaymentService {
                 return null;
             }
 
-            return new PendingPayment(maSuatChieu, maGheList);
+            return new PendingPayment(List.of(new PendingSeatGroup(maSuatChieu, maGheList)));
         } catch (Exception e) {
             return null;
         }
@@ -840,24 +836,75 @@ public class PaymentService {
         return result;
     }
 
-    private List<Integer> normalizeMaGheList(CreatePaymentRequest request) {
-        LinkedHashSet<Integer> result = new LinkedHashSet<>();
+    private PendingPayment normalizePendingPayment(CreatePaymentRequest request) {
+        List<PendingSeatGroup> groups = new ArrayList<>();
 
-        if (request.getMaGheList() != null) {
-            request.getMaGheList().stream()
-                    .filter(maGhe -> maGhe != null && maGhe > 0)
-                    .forEach(result::add);
+        if (request.getItems() != null && !request.getItems().isEmpty()) {
+            for (CreatePaymentRequest.PaymentSeatGroup item : request.getItems()) {
+                if (item == null || item.getMaSuatChieu() == null || item.getMaSuatChieu() <= 0) {
+                    continue;
+                }
+
+                List<Integer> maGheList = normalizeSeatIds(item.getMaGheList(), null);
+
+                if (!maGheList.isEmpty()) {
+                    groups.add(new PendingSeatGroup(item.getMaSuatChieu(), maGheList));
+                }
+            }
         }
 
-        if (request.getMaGhe() != null && request.getMaGhe() > 0) {
-            result.add(request.getMaGhe());
+        if (groups.isEmpty()) {
+            List<Integer> maGheList = normalizeSeatIds(request.getMaGheList(), request.getMaGhe());
+
+            if (request.getMaSuatChieu() != null && request.getMaSuatChieu() > 0 && !maGheList.isEmpty()) {
+                groups.add(new PendingSeatGroup(request.getMaSuatChieu(), maGheList));
+            }
         }
 
-        if (result.isEmpty()) {
+        if (groups.isEmpty()) {
             throw new IllegalArgumentException("Vui lòng chọn ghế");
         }
 
+        return new PendingPayment(groups);
+    }
+
+    private List<Integer> normalizeSeatIds(List<Integer> maGheList, Integer maGhe) {
+        LinkedHashSet<Integer> result = new LinkedHashSet<>();
+
+        if (maGheList != null) {
+            maGheList.stream()
+                    .filter(seatId -> seatId != null && seatId > 0)
+                    .forEach(result::add);
+        }
+
+        if (maGhe != null && maGhe > 0) {
+            result.add(maGhe);
+        }
+
         return new ArrayList<>(result);
+    }
+
+    private PendingPayment pendingPaymentFromRawItems(Object value) {
+        if (!(value instanceof List<?> rawItems)) {
+            return null;
+        }
+
+        List<PendingSeatGroup> groups = new ArrayList<>();
+
+        for (Object rawItem : rawItems) {
+            if (!(rawItem instanceof Map<?, ?> item)) {
+                continue;
+            }
+
+            Integer maSuatChieu = asInteger(item.get("maSuatChieu"));
+            List<Integer> maGheList = asIntegerList(item.get("maGheList"));
+
+            if (maSuatChieu != null && !maGheList.isEmpty()) {
+                groups.add(new PendingSeatGroup(maSuatChieu, maGheList));
+            }
+        }
+
+        return groups.isEmpty() ? null : new PendingPayment(groups);
     }
 
     private long parseLong(String value) {
@@ -877,7 +924,9 @@ public class PaymentService {
         return value instanceof PendingPayment pendingPayment ? pendingPayment : null;
     }
 
-    private void savePendingPayment(Integer maThanhToan, Integer maSuatChieu, Integer maNguoiDung, List<Integer> maGheList) {
+    private void savePendingPayment(Integer maThanhToan, Integer maNguoiDung, PendingPayment pendingPayment) {
+        Integer firstMaSuatChieu = pendingPayment.firstMaSuatChieu();
+
         jdbcTemplate.update("""
                 INSERT INTO thanh_toan_cho_duyet
                     (ma_thanh_toan, ma_suat_chieu, ma_nguoi_dung, trang_thai, thoi_gian_tao)
@@ -889,19 +938,33 @@ public class PaymentService {
                     thoi_gian_tao = EXCLUDED.thoi_gian_tao,
                     thoi_gian_yeu_cau = NULL,
                     thoi_gian_xu_ly = NULL
-                """, maThanhToan, maSuatChieu, maNguoiDung, TRANG_THAI_CHO_KHACH);
+                """, maThanhToan, firstMaSuatChieu, maNguoiDung, TRANG_THAI_CHO_KHACH);
 
         jdbcTemplate.update(
                 "DELETE FROM thanh_toan_cho_duyet_ghe WHERE ma_thanh_toan = ?",
                 maThanhToan
         );
+        jdbcTemplate.update(
+                "DELETE FROM thanh_toan_cho_duyet_ghe_chi_tiet WHERE ma_thanh_toan = ?",
+                maThanhToan
+        );
 
-        for (Integer maGhe : maGheList) {
-            jdbcTemplate.update("""
-                    INSERT INTO thanh_toan_cho_duyet_ghe (ma_thanh_toan, ma_ghe)
-                    VALUES (?, ?)
-                    ON CONFLICT (ma_thanh_toan, ma_ghe) DO NOTHING
-                    """, maThanhToan, maGhe);
+        for (PendingSeatGroup group : pendingPayment.groups()) {
+            for (Integer maGhe : group.maGheList()) {
+                jdbcTemplate.update("""
+                        INSERT INTO thanh_toan_cho_duyet_ghe_chi_tiet (ma_thanh_toan, ma_suat_chieu, ma_ghe)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT (ma_thanh_toan, ma_suat_chieu, ma_ghe) DO NOTHING
+                        """, maThanhToan, group.maSuatChieu(), maGhe);
+
+                if (group.maSuatChieu().equals(firstMaSuatChieu)) {
+                    jdbcTemplate.update("""
+                            INSERT INTO thanh_toan_cho_duyet_ghe (ma_thanh_toan, ma_ghe)
+                            VALUES (?, ?)
+                            ON CONFLICT (ma_thanh_toan, ma_ghe) DO NOTHING
+                            """, maThanhToan, maGhe);
+                }
+            }
         }
     }
 
@@ -920,6 +983,32 @@ public class PaymentService {
             return null;
         }
 
+        List<PendingSeatGroup> groups = jdbcTemplate.query(
+                """
+                        SELECT ma_suat_chieu, ma_ghe
+                        FROM thanh_toan_cho_duyet_ghe_chi_tiet
+                        WHERE ma_thanh_toan = ?
+                        ORDER BY ma_suat_chieu, ma_ghe
+                        """,
+                rs -> {
+                    Map<Integer, List<Integer>> groupedSeats = new LinkedHashMap<>();
+
+                    while (rs.next()) {
+                        groupedSeats.computeIfAbsent(rs.getInt("ma_suat_chieu"), key -> new ArrayList<>())
+                                .add(rs.getInt("ma_ghe"));
+                    }
+
+                    return groupedSeats.entrySet().stream()
+                            .map(entry -> new PendingSeatGroup(entry.getKey(), entry.getValue()))
+                            .toList();
+                },
+                maThanhToan
+        );
+
+        if (!groups.isEmpty()) {
+            return new PendingPayment(groups);
+        }
+
         List<Integer> maGheList = jdbcTemplate.queryForList(
                 """
                         SELECT ma_ghe
@@ -931,7 +1020,9 @@ public class PaymentService {
                 maThanhToan
         );
 
-        return maGheList.isEmpty() ? null : new PendingPayment(maSuatChieuList.get(0), maGheList);
+        return maGheList.isEmpty()
+                ? null
+                : new PendingPayment(List.of(new PendingSeatGroup(maSuatChieuList.get(0), maGheList)));
     }
 
     private boolean isPendingPaymentOwner(Integer maThanhToan, NguoiDung user) {
@@ -1043,16 +1134,75 @@ public class PaymentService {
         }
 
         return seatHoldService.getHoldExpiresAtMillis(
-                pendingPayment.maSuatChieu(),
+                pendingPayment.firstMaSuatChieu(),
                 pendingPayment.firstMaGhe(),
                 user
         );
     }
 
-    private record PendingPayment(Integer maSuatChieu, List<Integer> maGheList) {
-        private Integer firstMaGhe() {
-            return maGheList != null && !maGheList.isEmpty() ? maGheList.get(0) : null;
+    private List<VeDTO> emitTickets(PendingPayment pendingPayment) {
+        List<VeDTO> veList = new ArrayList<>();
+
+        for (PendingSeatGroup group : pendingPayment.groups()) {
+            SuatChieu suatChieu = suatChieuRepository.findById(group.maSuatChieu()).orElse(null);
+            List<Ghe> gheList = gheRepository.findAllById(group.maGheList());
+
+            if (suatChieu == null || gheList.size() != group.maGheList().size()) {
+                throw new IllegalArgumentException("Suất chiếu hoặc ghế không tồn tại");
+            }
+
+            for (Ghe ghe : gheList) {
+                boolean daDat = veRepository.existsBySuatChieu_MaSuatChieuAndGhe_MaGhe(
+                        suatChieu.getMaSuatChieu(),
+                        ghe.getMaGhe()
+                );
+
+                if (daDat) {
+                    throw new IllegalArgumentException("Ghế " + ghe.getSoGhe() + " đã được đặt");
+                }
+            }
+
+            for (Ghe ghe : gheList) {
+                veList.add(veService.emitTicket(suatChieu, ghe));
+            }
         }
+
+        return veList;
+    }
+
+    private void releaseHeldSeats(List<HeldSeat> heldSeats) {
+        heldSeats.forEach(heldSeat ->
+                seatHoldService.release(heldSeat.maSuatChieu(), heldSeat.maGhe()));
+    }
+
+    private void releasePendingPaymentSeats(PendingPayment pendingPayment) {
+        pendingPayment.groups().forEach(group ->
+                group.maGheList().forEach(maGhe ->
+                        seatHoldService.release(group.maSuatChieu(), maGhe)));
+    }
+
+    private record PendingPayment(List<PendingSeatGroup> groups) {
+        private Integer firstMaSuatChieu() {
+            return groups != null && !groups.isEmpty() ? groups.get(0).maSuatChieu() : null;
+        }
+
+        private Integer firstMaGhe() {
+            return groups != null && !groups.isEmpty() && !groups.get(0).maGheList().isEmpty()
+                    ? groups.get(0).maGheList().get(0)
+                    : null;
+        }
+
+        private List<Integer> maGheList() {
+            return groups == null
+                    ? List.of()
+                    : groups.stream().flatMap(group -> group.maGheList().stream()).toList();
+        }
+    }
+
+    private record PendingSeatGroup(Integer maSuatChieu, List<Integer> maGheList) {
+    }
+
+    private record HeldSeat(Integer maSuatChieu, Integer maGhe) {
     }
 
     public record ApiResponse(boolean success, String message) {
